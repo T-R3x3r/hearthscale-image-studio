@@ -290,7 +290,7 @@ body {
   justify-content: center;
   gap: var(--gap-inline);
   min-height: var(--h-ctl-md);
-  padding: var(--gap-stack) calc(var(--space) * 3.5);
+  padding: var(--gap-stack) calc(var(--space) * 3.5) calc(var(--space) * 4);
 }
 
 .is-bar-slider {
