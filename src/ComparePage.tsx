@@ -39,7 +39,7 @@ export function ComparePage(props: {
       <main className="is-compare-page">
         {props.models.length < 2 ? (
           <Notice>
-            Compare needs two image models or more on this computer.
+            Compare needs at least two image models.
             <button className="hs-link" onClick={props.onGetModels}>
               Get models
             </button>

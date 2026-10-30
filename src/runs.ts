@@ -187,7 +187,7 @@ export async function recoverRuns(): Promise<void> {
     } catch {
       // No folder: the job wrote nothing.
     }
-    await fail(run, 'failed', 'Hearthscale stopped before the pictures were done.');
+    await fail(run, 'failed', 'Hearthscale stopped before the pictures were done. Make them again.');
   }
 }
 

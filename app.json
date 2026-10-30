@@ -101,7 +101,7 @@
     },
     {
       "name": "release",
-      "title": "Let go of pictures",
+      "title": "Release pictures",
       "description": "Drops the assets a finished job read.",
       "input": {
         "type": "object",

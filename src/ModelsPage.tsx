@@ -23,7 +23,7 @@ export type Downloads = Map<string, { receivedBytes: number; totalBytes: number 
 /** Why a file of a repository cannot be installed, in plain words. */
 function whyNot(file: HubCandidate): string | undefined {
   if (file.reason) return file.reason;
-  if (!file.verifiable) return 'The repository states no checksum for this file.';
+  if (!file.verifiable) return 'This file cannot be checked after it downloads';
   if (file.requires.some((need) => need.options.length === 0)) return 'A file this model needs is not on Hugging Face.';
   return undefined;
 }
@@ -265,7 +265,7 @@ export function ModelsPage(props: {
         )}
         {open && (
           <SettingsCard>
-            {open.candidates.length === 0 && <ListRow title="No file here runs on this Server" />}
+            {open.candidates.length === 0 && <ListRow title="None of these files run on this Server" />}
             {open.candidates.map((file) => {
               const why = whyNot(file);
               const tip = tips(file.path, why);

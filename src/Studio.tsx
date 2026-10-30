@@ -155,7 +155,7 @@ async function complete(content: ChatMessage['content'], system: string | null):
     if (id !== stream) return;
     if ('text' in delta) {
       if (!delta.reasoning) text += delta.text;
-    } else if (delta.stop === 'error') failure = delta.error ?? 'The chat model stopped.';
+    } else if (delta.stop === 'error') failure = delta.error ?? 'The chat model stopped. Try again.';
   });
   try {
     await call('hearthscale/models/complete', {
@@ -1033,7 +1033,7 @@ export function Studio() {
       {deleting && (
         <ShellConfirm
           title="Delete this picture?"
-          body="The picture file goes too."
+          body="Its file in the app's folder is deleted too."
           action="Delete"
           tone="danger"
           onConfirm={() => void remove(deleting)}

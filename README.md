@@ -2,7 +2,7 @@
 
 Make and change pictures with the image models on your own computer.
 
-Type what you want to see and press **Make**. Image Studio draws it with an
+Write what you want to see and choose **Make**. Image Studio draws it with an
 image model that runs on your computer, or on a Hearthscale Server you paired
 with it, and keeps every picture in its library.
 
@@ -13,9 +13,9 @@ with it, and keeps every picture in its library.
 - **Vary** a picture a little or a lot, or make **more** like it.
 - **Edit** a picture: describe the change, paint over a part to **fill** it
   or **erase** it, or **extend** it past its edges. With a model made for
-  editing, such as FLUX.2 klein, you can also add more pictures to the prompt
-  and **remove the background**.
-- Make a picture **bigger** with an upscale model.
+  editing, you can also add more pictures to the prompt and **remove the
+  background**.
+- **Enlarge** a picture into a larger, sharper copy.
 - **Compare** two to four models on the same words and see which you like.
 - **Get models**: install the models your Server suggests, or search Hugging
   Face for any image model your Server can run.

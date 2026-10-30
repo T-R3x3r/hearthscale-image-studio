@@ -9,7 +9,7 @@ export function sizeOf(path: string): Promise<{ width: number; height: number }>
     known = new Promise((resolve, reject) => {
       const image = new Image();
       image.onload = () => resolve({ width: image.naturalWidth, height: image.naturalHeight });
-      image.onerror = () => reject(new Error('The picture did not load.'));
+      image.onerror = () => reject(new Error('The picture did not load. Try again.'));
       image.src = fileUrl(path);
     });
     sizes.set(path, known);
@@ -27,14 +27,17 @@ function loadImage(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const image = new Image();
     image.onload = () => resolve(image);
-    image.onerror = () => reject(new Error('The picture did not load.'));
+    image.onerror = () => reject(new Error('The picture did not load. Try again.'));
     image.src = src;
   });
 }
 
 function toPng(canvas: HTMLCanvasElement): Promise<Blob> {
   return new Promise((resolve, reject) =>
-    canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error('The picture could not be made.'))), 'image/png'),
+    canvas.toBlob(
+      (blob) => (blob ? resolve(blob) : reject(new Error('The picture could not be made. Try again.'))),
+      'image/png',
+    ),
   );
 }
 
