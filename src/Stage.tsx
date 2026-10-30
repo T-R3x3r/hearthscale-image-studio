@@ -353,7 +353,7 @@ export function Stage(props: StageProps) {
     );
   } else {
     body = (
-      <EmptyState icon={<Icon name="image-ai-line" size={30} />} title="New picture">
+      <EmptyState icon={<Icon name="image-ai-line" size={30} />} title="Start from an idea">
         <div className="is-ideas">
           {IDEAS.map((idea) => (
             <Chip key={idea} onClick={() => props.onIdea(idea)}>
