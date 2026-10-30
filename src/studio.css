@@ -174,16 +174,18 @@ body {
 }
 
 .is-thumb[data-on='true'],
-.is-strip-item[data-on='true'] {
+.is-strip-item[data-on='true']:not([data-making]) {
   box-shadow:
     0 0 0 var(--bw) var(--win),
     0 0 0 calc(var(--bw) * 3) var(--selection-ink);
 }
 
+/* Keyboard focus draws outside the ring, so a focused picture keeps
+   showing whether it is the selected one. */
 .is-thumb:focus-visible,
 .is-strip-item:focus-visible {
-  outline: none;
-  box-shadow: var(--focus);
+  outline: calc(var(--bw) * 2) solid var(--mut);
+  outline-offset: calc(var(--bw) * 4);
 }
 
 /* The favourite's mark sits on a dark disc, so it shows on a light picture
