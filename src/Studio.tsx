@@ -301,6 +301,7 @@ export function Studio() {
   }, []);
 
   const show = useCallback(async (picture: Picture | null) => {
+    setProblem(null);
     setShown(picture);
     setComparing(false);
     if (!picture) return;
@@ -341,6 +342,9 @@ export function Studio() {
   }, [opened, page, shown?.id]);
 
   useEffect(() => setFolded(cramped), [cramped]);
+
+  // A problem belongs to what failed; another page or another picture to edit leaves it behind.
+  useEffect(() => setProblem(null), [page, source?.id]);
 
   useEffect(() => on('hearthscale/models/chosen', () => void refreshModels()), [refreshModels]);
 
