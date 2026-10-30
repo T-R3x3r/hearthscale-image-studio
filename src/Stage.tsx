@@ -140,7 +140,8 @@ function Brush(props: {
   );
 }
 
-export function Stage(props: {
+/** What the stage and its bar show, and what they report. */
+export interface StageProps {
   /** Whether the bar keeps only its main actions and puts the rest in the More menu. */
   narrow: boolean;
   picture: Picture | null;
@@ -169,10 +170,10 @@ export function Stage(props: {
   margins: Margins | null;
   actions: PictureActions | null;
   onStopEditing: () => void;
-}) {
+}
+
+export function Stage(props: StageProps) {
   const area = useRef<HTMLDivElement>(null);
-  const [menu, setMenu] = useState<MenuAnchor | null>(null);
-  const [varyMenu, setVaryMenu] = useState<MenuAnchor | null>(null);
   const tips = useFloatingTips('top');
   const { picture, size, margins } = props;
   const isSource = !!picture && picture.id === props.source?.id;
@@ -272,6 +273,22 @@ export function Stage(props: {
     );
   }
 
+  return (
+    <div className="is-stage">
+      <div className="is-stage-area" ref={area}>
+        {body}
+      </div>
+    </div>
+  );
+}
+
+/** The actions of the picture on the stage, or the options of the tool in use. */
+export function StageBar(props: StageProps) {
+  const [menu, setMenu] = useState<MenuAnchor | null>(null);
+  const [varyMenu, setVaryMenu] = useState<MenuAnchor | null>(null);
+  const tips = useFloatingTips('bottom');
+  const { picture } = props;
+  const isSource = !!picture && picture.id === props.source?.id;
   const actions = props.actions;
   const tip = (key: string, text: string) => tips(key, text);
 
@@ -416,19 +433,16 @@ export function Stage(props: {
   }
 
   return (
-    <div className="is-stage">
-      <div className="is-stage-area" ref={area}>
-        {body}
-      </div>
-      <div className="is-stage-bar">{bar}</div>
+    <div className="is-bar-group">
+      {bar}
       {varyMenu && actions?.vary && (
-        <MenuSurface anchor={varyMenu} dir="up" onDismiss={() => setVaryMenu(null)}>
+        <MenuSurface anchor={varyMenu} dir="down" onDismiss={() => setVaryMenu(null)}>
           <MItem label="Vary a little" onClick={() => (setVaryMenu(null), actions.vary!('little'))} />
           <MItem label="Vary a lot" onClick={() => (setVaryMenu(null), actions.vary!('lot'))} />
         </MenuSurface>
       )}
       {menu && actions && (
-        <MenuSurface anchor={menu} dir="up" onDismiss={() => setMenu(null)}>
+        <MenuSurface anchor={menu} dir="down" onDismiss={() => setMenu(null)}>
           {props.narrow && actions.vary && (
             <>
               <MItem

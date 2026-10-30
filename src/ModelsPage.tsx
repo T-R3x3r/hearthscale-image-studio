@@ -8,7 +8,6 @@ import {
   ListRow,
   Meter,
   Notice,
-  PageTitle,
   SegmentedControl,
   SettingsCard,
   SettingsSection,
@@ -115,7 +114,6 @@ export function ModelsPage(props: {
   return (
     <div className="hs-scroll hs-settings-scroll is-page">
       <main className="hs-settings-content">
-        <PageTitle>Get models</PageTitle>
         {problem && <Notice>{problem}</Notice>}
 
         {props.models.downloading.length > 0 && (

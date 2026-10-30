@@ -185,12 +185,22 @@ body {
   box-sizing: border-box;
 }
 
+.is-bar-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  font-size: var(--fs-row);
+  font-weight: var(--fw-med);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .is-stage {
   display: flex;
   flex: 1;
   flex-direction: column;
   min-height: 0;
-  padding: calc(var(--space) * 4.5) calc(var(--space) * 7.25) 0;
+  padding: calc(var(--space) * 4.5) calc(var(--space) * 7.25);
 }
 
 .is-stage-area {
@@ -289,15 +299,11 @@ body {
   border-radius: var(--r-card);
 }
 
-.is-stage-bar {
+.is-bar-group {
   display: flex;
   flex: none;
-  flex-wrap: wrap;
   align-items: center;
-  justify-content: center;
   gap: var(--gap-inline);
-  min-height: var(--h-ctl-md);
-  padding: var(--gap-stack) calc(var(--space) * 3.5) calc(var(--space) * 4);
 }
 
 .is-bar-slider {

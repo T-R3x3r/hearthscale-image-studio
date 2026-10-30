@@ -1,5 +1,5 @@
 import type { ModelCard } from '@hearthscale/app';
-import { Button, Chip, Icon, Meter, Notice, PageTitle, StatusWord, useFloatingTips } from '@hearthscale/app-ui';
+import { Button, Chip, Icon, Meter, Notice, StatusWord, useFloatingTips } from '@hearthscale/app-ui';
 import { assetUrl, fileUrl } from './bridge';
 import type { Picture, Run } from './records';
 import type { Live } from './runs';
@@ -37,7 +37,6 @@ export function ComparePage(props: {
   return (
     <div className="hs-scroll hs-settings-scroll is-page">
       <main className="is-compare-page">
-        <PageTitle>Compare models</PageTitle>
         {props.models.length < 2 ? (
           <Notice>
             Compare needs two image models or more on this computer.

@@ -43,7 +43,7 @@ import {
 } from './recipes';
 import { cancelRun, newId, onEnded, recoverRuns, startRun, useLive } from './runs';
 import { Library } from './Library';
-import { Stage, type PictureActions, type Sides, type Tool } from './Stage';
+import { Stage, StageBar, type PictureActions, type Sides, type StageProps, type Tool } from './Stage';
 import { PromptBar, type Advanced, type Mode } from './PromptBar';
 import { ComparePage, type Column } from './ComparePage';
 import { ModelsPage, type Downloads } from './ModelsPage';
@@ -773,6 +773,53 @@ export function Studio() {
   const columns: Column[] = compareRuns.map(({ run, picture }) => ({ run, picture, live: live.get(run.id) ?? null }));
   const fold = tips('fold', folded ? 'Show the library' : 'Hide the library');
   const lightboxItems = strip.length ? strip : shown ? [shown] : [];
+  const stageProps: StageProps = {
+    narrow,
+    picture: stagePicture,
+    size: stageSize,
+    source,
+    sourceOf: shownFrom,
+    comparing,
+    onStopCompare: () => setComparing(false),
+    live: stripLive,
+    liveLabel: stripRun
+      ? `${stripRun.action === 'make' ? 'Making' : stripRun.action === 'bigger' ? 'Making it bigger' : 'Changing'} with ${stripRun.label}`
+      : '',
+    noModel: !!models && imageCards.length === 0,
+    onGetModels: () => setPage('models'),
+    onIdea: setWords,
+    tool: currentTool,
+    onTool: (next) => {
+      setTool(next);
+      if (next !== 'none') setShown(source);
+    },
+    strokes,
+    brushSize,
+    onBrushSize: setBrushSize,
+    erasing,
+    onErasing: setErasing,
+    painted,
+    onStroke: (stroke) => setStrokes((before) => [...before, stroke]),
+    onClearStrokes: () => setStrokes([]),
+    sides,
+    onSides: setSides,
+    margins,
+    actions,
+    onStopEditing: () => {
+      setSource(null);
+      setReferences([]);
+    },
+  };
+  const title =
+    page === 'compare'
+      ? 'Compare models'
+      : page === 'models'
+        ? 'Get models'
+        : stagePicture
+          ? stagePicture.prompt || 'Opened picture'
+          : stripRun && stripLive
+            ? stripRun.prompt
+            : 'New picture';
   const away = () => {
     if (cramped) setFolded(true);
   };
@@ -824,48 +871,12 @@ export function Studio() {
             </IconButton>
             {fold.tip}
           </span>
+          <span className="is-bar-title">{title}</span>
+          {page === 'studio' && <StageBar {...stageProps} />}
         </div>
         {page === 'studio' && (
           <>
-            <Stage
-              narrow={narrow}
-              picture={stagePicture}
-              size={stageSize}
-              source={source}
-              sourceOf={shownFrom}
-              comparing={comparing}
-              onStopCompare={() => setComparing(false)}
-              live={stripLive}
-              liveLabel={
-                stripRun
-                  ? `${stripRun.action === 'make' ? 'Making' : stripRun.action === 'bigger' ? 'Making it bigger' : 'Changing'} with ${stripRun.label}`
-                  : ''
-              }
-              noModel={!!models && imageCards.length === 0}
-              onGetModels={() => setPage('models')}
-              onIdea={setWords}
-              tool={currentTool}
-              onTool={(next) => {
-                setTool(next);
-                if (next !== 'none') setShown(source);
-              }}
-              strokes={strokes}
-              brushSize={brushSize}
-              onBrushSize={setBrushSize}
-              erasing={erasing}
-              onErasing={setErasing}
-              painted={painted}
-              onStroke={(stroke) => setStrokes((before) => [...before, stroke])}
-              onClearStrokes={() => setStrokes([])}
-              sides={sides}
-              onSides={setSides}
-              margins={margins}
-              actions={actions}
-              onStopEditing={() => {
-                setSource(null);
-                setReferences([]);
-              }}
-            />
+            <Stage {...stageProps} />
             {stripRun && (stripLive || strip.length > 1 || (stripRun.action === 'make' && strip.length > 0)) && (
               <div className="is-strip">
                 {strip.map((picture) => (
