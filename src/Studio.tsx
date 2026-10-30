@@ -233,8 +233,8 @@ export function Studio() {
   const [deleting, setDeleting] = useState<Picture | null>(null);
   const [helping, setHelping] = useState(false);
   const [starting, setStarting] = useState(false);
-  const [resubmit, setResubmit] = useState(false);
   const [opened, setOpened] = useState(false);
+  const composer = useRef<HTMLDivElement>(null);
   const shownBlob = useRef<{ path: string; blob: Blob } | null>(null);
   const shownBefore = useRef<Picture | null>(null);
   const stripRunRef = useRef<Run | null>(null);
@@ -297,11 +297,7 @@ export function Studio() {
 
   useEffect(() => setFolded(cramped), [cramped]);
 
-  useEffect(() => {
-    if (!resubmit) return;
-    setResubmit(false);
-    void submit();
-  }, [resubmit]);
+  useEffect(() => on('hearthscale/models/chosen', () => void refreshModels()), [refreshModels]);
 
   useEffect(
     () =>
@@ -431,14 +427,6 @@ export function Studio() {
     if (!model || !ready || starting) return;
     setStarting(true);
     try {
-      // A pick in the model slot changes the app's model in Hearthscale, so
-      // a run reads the choice first and starts on the model the picker shows.
-      const { chosen } = await call('hearthscale/models/list', { kind: 'image' });
-      if ((chosen.image?.card ?? null) !== models?.chosen) {
-        await refreshModels();
-        setResubmit(true);
-        return;
-      }
       if (action === 'compare') return await compare();
       if (action === 'make') return await make();
       await change(action);
@@ -795,7 +783,7 @@ export function Studio() {
   const lightboxItems = strip.length ? strip : shown ? [shown] : [];
   const lightbox = large !== null && lightboxItems.length > 0;
   /** A part the view draws over the prompt's footer, under which the model slot lies. */
-  const covering = lightbox || !!deleting || !!toast || (cramped && !folded);
+  const covering = lightbox || !!deleting || (cramped && !folded);
   const suggestedImage = models?.downloading.find((card) => card.kind === 'image') ?? models?.absentImage[0] ?? null;
   const stageProps: StageProps = {
     narrow,
@@ -994,6 +982,7 @@ export function Studio() {
             onOpenFile={(file) => void openFile(file)}
             canAddReference={editing && abilities.edit && references.length < 9}
             abilities={abilities}
+            composer={composer}
             shape={prefs.shape}
             onShape={(shape) => setPrefs({ shape })}
             size={prefs.size}
@@ -1048,7 +1037,11 @@ export function Studio() {
         />
       )}
       {toast && (
-        <Toast action={toast.undo ? { label: 'Undo', onPress: toast.undo } : undefined} onClose={() => setToast(null)}>
+        <Toast
+          action={toast.undo ? { label: 'Undo', onPress: toast.undo } : undefined}
+          above={composer}
+          onClose={() => setToast(null)}
+        >
           {toast.text}
         </Toast>
       )}

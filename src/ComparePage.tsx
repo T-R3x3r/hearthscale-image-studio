@@ -61,7 +61,12 @@ export function ComparePage(props: {
           ) : (
             <div className="is-compare-pick">
               {props.models.map((card) => (
-                <Chip key={card.id} selected={props.picked.includes(card.id)} onClick={() => flip(card.id)}>
+                <Chip
+                  key={card.id}
+                  icon={card.identity && <ModelAvatar identity={card.identity} server={card.provider} size={16} />}
+                  selected={props.picked.includes(card.id)}
+                  onClick={() => flip(card.id)}
+                >
                   {card.label}
                 </Chip>
               ))}

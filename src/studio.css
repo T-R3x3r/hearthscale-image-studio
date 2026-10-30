@@ -36,11 +36,12 @@ body {
   gap: var(--space);
 }
 
-/* The model slot: the footer's free room, at least the slot's least size,
-   as high as the footer's other pickers. */
+/* The model slot: the footer's free room, as high as the footer's other
+   pickers, and wide enough for a usual model name; where the row has less
+   room, it moves to a row of its own. */
 .is-model-slot {
   flex: 1;
-  min-width: calc(var(--space) * 30);
+  min-width: calc(var(--space) * 60);
   height: calc(var(--space) * 6.5);
 }
 

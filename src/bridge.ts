@@ -1,9 +1,4 @@
-import {
-  App,
-  McpUiMessageResultSchema,
-  PostMessageTransport,
-  type McpUiHostContext,
-} from '@modelcontextprotocol/ext-apps';
+import { App, PostMessageTransport, type McpUiHostContext } from '@modelcontextprotocol/ext-apps';
 import { hostCall } from '@hearthscale/app/view';
 import type { ViewExtensionNotification, ViewHostContext } from '@hearthscale/app';
 
@@ -14,13 +9,9 @@ export const call = hostCall(app);
 
 /** Saves a picture where the person picks, from a click. */
 export function download(name: string, blob: Blob): Promise<{ isError?: boolean }> {
-  return app.request(
-    {
-      method: 'ui/download-file',
-      params: { contents: [{ type: 'resource', resource: { uri: `file:///${name}`, mimeType: blob.type, blob } }] },
-    } as never,
-    McpUiMessageResultSchema,
-  ) as never;
+  return call('ui/download-file', {
+    contents: [{ type: 'resource', resource: { uri: `file:///${name}`, mimeType: blob.type, blob } }],
+  });
 }
 
 /** Runs a tool of the app's backend and answers its structured result. */

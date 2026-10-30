@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState, type MouseEvent, type ReactNode } from 'react';
+import { useLayoutEffect, useRef, useState, type MouseEvent, type ReactNode, type RefObject } from 'react';
 import {
   Button,
   Icon,
@@ -122,6 +122,8 @@ export function PromptBar(props: {
   onOpenFile: (file: File) => void;
   canAddReference: boolean;
   abilities: Abilities;
+  /** The composer's box, which the view's toast sits above. */
+  composer: RefObject<HTMLDivElement | null>;
   shape: ShapeId;
   onShape: (shape: ShapeId) => void;
   size: SizeId;
@@ -167,7 +169,7 @@ export function PromptBar(props: {
   const chips = [props.source, ...props.references].filter((p): p is Picture => !!p);
 
   return (
-    <div className="hs-composer">
+    <div className="hs-composer" ref={props.composer}>
       <div className="hs-composer-main">
         {chips.length > 0 && (
           <div className="hs-composer-shelf">
