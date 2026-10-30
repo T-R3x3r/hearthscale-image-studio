@@ -73,7 +73,7 @@ export function ComparePage(props: {
           )}
           {props.columns.length === 0 && props.models.length >= 2 && (
             <div className="is-compare-empty">
-              <EmptyState icon={<Icon name="contrast-2-line" size={30} />} title="No comparisons yet" />
+              <EmptyState icon={<Icon name="layout-column-line" size={30} />} title="No comparisons yet" />
             </div>
           )}
           {props.columns.length > 0 && (
