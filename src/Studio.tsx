@@ -42,6 +42,12 @@ import { ProblemNotice, type Problem } from './Problem';
 
 type Page = 'studio' | 'compare';
 
+/** What a view of the tab shows again after it loads anew. */
+interface ViewState {
+  page: Page;
+  picture: string | null;
+}
+
 interface Prefs {
   shape: ShapeId;
   size: SizeId;
@@ -287,6 +293,12 @@ export function Studio() {
   useEffect(() => {
     void (async () => {
       await openLibrary();
+      const view = hostContext()['hearthscale/widgetState'] as ViewState | null | undefined;
+      if (view) {
+        setPage(view.page);
+        const picture = view.picture ? await getPicture(view.picture) : null;
+        if (picture) await show(picture);
+      }
       setOpened(true);
       const kept = (await call('hearthscale/store/get', { key: 'prefs' })).value as Partial<Prefs> | null;
       if (kept) setPrefsState({ ...PREFS, ...kept });
@@ -296,11 +308,17 @@ export function Studio() {
       setCompareSet(set);
       await loadCompare(set);
     })().catch(failed('The library did not open.', null));
-  }, [refreshModels, loadCompare]);
+  }, [refreshModels, loadCompare, show]);
 
   useEffect(() => {
     void refreshLibrary();
   }, [refreshLibrary]);
+
+  useEffect(() => {
+    if (!opened) return;
+    const state: ViewState = { page, picture: shown?.id ?? null };
+    void call('hearthscale/ui/set-widget-state', { state });
+  }, [opened, page, shown?.id]);
 
   useEffect(() => setFolded(cramped), [cramped]);
 
