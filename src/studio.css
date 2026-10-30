@@ -411,6 +411,10 @@ body {
   width: calc(var(--space) * 70);
 }
 
+.is-advanced > .is-tipwrap > * {
+  flex: 1;
+}
+
 /* Pages */
 
 .is-model-meter {

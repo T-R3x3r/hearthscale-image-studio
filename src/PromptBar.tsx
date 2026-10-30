@@ -106,6 +106,16 @@ export function PromptBar(props: {
   const { negative, steps, guidance, seed } = props.abilities;
   const settable = negative || steps || guidance || seed;
   const more = tips('advanced', settable ? 'More settings' : 'This model takes no more settings');
+  /** A control with a tooltip that explains the app's word on it. */
+  const explained = (key: string, text: string, control: ReactNode) => {
+    const t = tips(key, text);
+    return (
+      <span {...t.hover} className="is-tipwrap">
+        {control}
+        {t.tip}
+      </span>
+    );
+  };
   const chips = [props.source, ...props.references].filter((p): p is Picture => !!p);
 
   return (
@@ -271,18 +281,26 @@ export function PromptBar(props: {
             </IconButton>
             {more.tip}
           </span>
-          {props.showMode && (
-            <SegmentedControl
-              label="How to change the picture"
-              value={props.mode}
-              options={[
-                { value: 'edit', label: 'Edit' },
-                { value: 'redraw', label: 'Redraw' },
-              ]}
-              onChange={props.onMode}
-            />
-          )}
-          {props.amount !== null && <span className="is-bar-label">Amount</span>}
+          {props.showMode &&
+            explained(
+              'mode',
+              'Edit changes what you name; Redraw paints the picture again from your words',
+              <SegmentedControl
+                label="How to change the picture"
+                value={props.mode}
+                options={[
+                  { value: 'edit', label: 'Edit' },
+                  { value: 'redraw', label: 'Redraw' },
+                ]}
+                onChange={props.onMode}
+              />,
+            )}
+          {props.amount !== null &&
+            explained(
+              'amount',
+              'How far the new picture may move from this one',
+              <span className="is-bar-label">Amount</span>,
+            )}
           {props.amount !== null && (
             <div className="is-amount">
               <Slider
@@ -339,33 +357,42 @@ export function PromptBar(props: {
                 data-autofocus
               />
             )}
-            {props.abilities.steps && (
-              <TextField
-                label="Steps"
-                inputMode="numeric"
-                placeholder="Automatic"
-                value={props.advanced.steps}
-                onChange={set('steps')}
-              />
-            )}
-            {props.abilities.guidance && (
-              <TextField
-                label="Prompt strength"
-                inputMode="decimal"
-                placeholder="Automatic"
-                value={props.advanced.guidance}
-                onChange={set('guidance')}
-              />
-            )}
-            {props.abilities.seed && (
-              <TextField
-                label="Variation number"
-                inputMode="numeric"
-                placeholder="Random"
-                value={props.advanced.seed}
-                onChange={set('seed')}
-              />
-            )}
+            {props.abilities.steps &&
+              explained(
+                'steps',
+                'More steps take longer and can add detail',
+                <TextField
+                  label="Steps"
+                  inputMode="numeric"
+                  placeholder="Automatic"
+                  value={props.advanced.steps}
+                  onChange={set('steps')}
+                />,
+              )}
+            {props.abilities.guidance &&
+              explained(
+                'guidance',
+                'How closely the picture follows the words',
+                <TextField
+                  label="Prompt strength"
+                  inputMode="decimal"
+                  placeholder="Automatic"
+                  value={props.advanced.guidance}
+                  onChange={set('guidance')}
+                />,
+              )}
+            {props.abilities.seed &&
+              explained(
+                'seed',
+                'The same number and the same words make the same picture again',
+                <TextField
+                  label="Variation number"
+                  inputMode="numeric"
+                  placeholder="Random"
+                  value={props.advanced.seed}
+                  onChange={set('seed')}
+                />,
+              )}
           </div>
         </Popover>
       )}

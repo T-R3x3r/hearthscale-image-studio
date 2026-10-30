@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState, type PointerEvent, type RefObject } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type PointerEvent, type ReactNode, type RefObject } from 'react';
 import {
   Button,
   Chip,
@@ -291,6 +291,16 @@ export function StageBar(props: StageProps) {
   const isSource = !!picture && picture.id === props.source?.id;
   const actions = props.actions;
   const tip = (key: string, text: string) => tips(key, text);
+  /** A control with a tooltip that explains the app's word on it. */
+  const explained = (key: string, text: string, control: ReactNode) => {
+    const t = tip(key, text);
+    return (
+      <span {...t.hover} className="is-tipwrap">
+        {control}
+        {t.tip}
+      </span>
+    );
+  };
 
   let bar = null;
   if (props.comparing) {
@@ -314,9 +324,13 @@ export function StageBar(props: StageProps) {
             shown={`${props.brushSize}`}
           />
         </div>
-        <Chip selected={props.erasing} onClick={() => props.onErasing(!props.erasing)}>
-          Eraser
-        </Chip>
+        {explained(
+          'eraser',
+          'Rub out brush strokes',
+          <Chip selected={props.erasing} onClick={() => props.onErasing(!props.erasing)}>
+            Eraser
+          </Chip>,
+        )}
         <Button variant="ghost" size="sm" onClick={props.onClearStrokes}>
           Clear
         </Button>
@@ -355,22 +369,30 @@ export function StageBar(props: StageProps) {
   } else if (isSource) {
     bar = (
       <>
-        <Button
-          variant="secondary"
-          size="sm"
-          icon={<Icon name="paint-brush-line" size={14} />}
-          onClick={() => props.onTool('brush')}
-        >
-          Brush
-        </Button>
-        <Button
-          variant="secondary"
-          size="sm"
-          icon={<Icon name="expand-diagonal-line" size={14} />}
-          onClick={() => props.onTool('extend')}
-        >
-          Extend
-        </Button>
+        {explained(
+          'brush',
+          'Paint over a part to fill it or erase it',
+          <Button
+            variant="secondary"
+            size="sm"
+            icon={<Icon name="paint-brush-line" size={14} />}
+            onClick={() => props.onTool('brush')}
+          >
+            Brush
+          </Button>,
+        )}
+        {explained(
+          'extend',
+          'Grow the picture past its edges',
+          <Button
+            variant="secondary"
+            size="sm"
+            icon={<Icon name="expand-diagonal-line" size={14} />}
+            onClick={() => props.onTool('extend')}
+          >
+            Extend
+          </Button>,
+        )}
         <Button variant="ghost" size="sm" icon={<Icon name="close-line" size={14} />} onClick={props.onStopEditing}>
           Stop editing
         </Button>
@@ -387,22 +409,35 @@ export function StageBar(props: StageProps) {
             Edit this
           </Button>
         )}
-        {actions.vary && !props.narrow && (
-          <Button
-            variant="secondary"
-            size="sm"
-            icon={<Icon name="shuffle-line" size={14} />}
-            trailingIcon={<Icon name="arrow-down-s-line" size={14} />}
-            onClick={(e) => setVaryMenu(anchorFrom('vary', e))}
-          >
-            Vary
-          </Button>
-        )}
-        {actions.enlarge && !props.narrow && (
-          <Button variant="secondary" size="sm" icon={<Icon name="zoom-in-line" size={14} />} onClick={actions.enlarge}>
-            Enlarge
-          </Button>
-        )}
+        {actions.vary &&
+          !props.narrow &&
+          explained(
+            'vary',
+            'New pictures close to this one',
+            <Button
+              variant="secondary"
+              size="sm"
+              icon={<Icon name="shuffle-line" size={14} />}
+              trailingIcon={<Icon name="arrow-down-s-line" size={14} />}
+              onClick={(e) => setVaryMenu(anchorFrom('vary', e))}
+            >
+              Vary
+            </Button>,
+          )}
+        {actions.enlarge &&
+          !props.narrow &&
+          explained(
+            'enlarge',
+            'A larger, sharper copy',
+            <Button
+              variant="secondary"
+              size="sm"
+              icon={<Icon name="zoom-in-line" size={14} />}
+              onClick={actions.enlarge}
+            >
+              Enlarge
+            </Button>,
+          )}
         <span {...favourite.hover} className="is-tipwrap">
           <IconButton
             className={picture.favourite ? 'hs-boxsel' : undefined}
