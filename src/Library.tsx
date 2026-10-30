@@ -100,6 +100,7 @@ export function Library(props: {
           value={props.words}
           placeholder="Search pictures"
           aria-label="Search pictures"
+          spellCheck={false}
           onChange={(e) => props.onWords(e.target.value)}
         />
       </div>
