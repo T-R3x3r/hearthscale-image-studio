@@ -27,6 +27,7 @@ export function ComparePage(props: {
   onShow: (picture: Picture) => void;
   onUse: (card: string) => void;
   onCancel: (run: string) => void;
+  onGetModels: () => void;
 }) {
   const tips = useFloatingTips('top');
   const flip = (id: string) => {
@@ -38,7 +39,12 @@ export function ComparePage(props: {
       <main className="is-compare-page">
         <PageTitle>Compare models</PageTitle>
         {props.models.length < 2 ? (
-          <Notice>Compare needs two image models or more on this computer.</Notice>
+          <Notice>
+            Compare needs two image models or more on this computer.
+            <button className="hs-link" onClick={props.onGetModels}>
+              Get models
+            </button>
+          </Notice>
         ) : (
           <div className="is-compare-pick">
             {props.models.map((card) => (

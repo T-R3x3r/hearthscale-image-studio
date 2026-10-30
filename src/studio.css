@@ -353,10 +353,6 @@ body {
   padding-top: calc(var(--space) * 4);
 }
 
-.is-problem .hs-link {
-  margin-left: var(--space);
-}
-
 .is-shelf-picture {
   display: block;
   width: 100%;

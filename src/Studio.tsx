@@ -920,6 +920,7 @@ export function Studio() {
             onShow={(picture) => (setPage('studio'), void show(picture))}
             onUse={(card) => setPrefs({ model: card })}
             onCancel={(run) => void cancelRun(run)}
+            onGetModels={() => setPage('models')}
           />
         )}
         {page === 'models' && models && (
@@ -934,14 +935,12 @@ export function Studio() {
         {page !== 'models' && (
           <div className="is-dock">
             {problem && (
-              <div className="is-problem">
-                <Notice>
-                  {problem}{' '}
-                  <button className="hs-link" onClick={() => setProblem(null)}>
-                    Close
-                  </button>
-                </Notice>
-              </div>
+              <Notice>
+                {problem}
+                <button className="hs-link" onClick={() => setProblem(null)}>
+                  Close
+                </button>
+              </Notice>
             )}
             <PromptBar
               words={words}
