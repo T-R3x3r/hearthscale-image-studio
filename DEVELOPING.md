@@ -25,16 +25,18 @@ release, `package.json` names the builder kit's `.tgz` files instead.
 
 | Part        | What it does                                                                                       |
 | ----------- | -------------------------------------------------------------------------------------------------- |
-| The view    | All of the interface: the library, the stage, the prompt, Compare and Get models.                   |
+| The view    | All of the interface: the library, the stage, the prompt and Compare. Hearthscale draws the model picker in a model slot of the prompt. |
 | The backend | Five tools only the view calls: `make`, `hold`, `release`, `keep` and `remove`.                     |
 
 The backend exists because only it can save a job's pictures into the app's
 data folder (`save` of `ctx.jobs.submit`) and read a picture of that folder
 as an asset a job takes (`ctx.assets.import`).
 
-- `make` submits an `image` or `upscale` job on the model the person picked,
-  with its outputs saved into `pictures/<run id>/` of the data folder. A job a
-  view's call starts is interactive, so it runs before batch work.
+- `make` submits an `image` or `upscale` job on the model the view names: the
+  app's model of that kind, read just before the run, or a run's own model
+  for Make more and Compare. Its outputs are saved into `pictures/<run id>/`
+  of the data folder. A job a view's call starts is interactive, so it runs
+  before batch work.
 - `hold` makes a library picture an asset for a job or for a chat model, and
   `release` drops those assets once the job has ended.
 - `keep` writes a picture the person opened into the library.
@@ -67,13 +69,13 @@ states (`jobs.image.input`) and offers only what that schema takes:
 | ------------------- | ----------------------------------------------------- |
 | `image`             | Change, Vary a little, Vary a lot                     |
 | `mask`              | Brush with Fill and Erase, Extend                     |
-| `references`        | Follow my words, more pictures in the prompt, Remove background |
+| `references`        | Edit, more pictures in the prompt, Remove background  |
 | `count`             | 1, 2 or 4 pictures a run                              |
 | `negativePrompt`, `steps`, `guidance`, `seed` | The fields of More settings      |
 
 A text-to-image model can read reference pictures without following them, and
 Hearthscale cannot tell the two apart, so the person chooses between
-**Follow my words** and **Redraw**.
+**Edit** and **Redraw**.
 
 The schema states no size of its own, so a picture's size comes from the
 shape and the size the person picks (`src/recipes.ts`), multiples of 64.
