@@ -388,6 +388,9 @@ body {
 }
 
 .is-bar-popover {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-row);
   width: calc(var(--space) * 56);
 }
 

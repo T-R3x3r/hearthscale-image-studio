@@ -160,10 +160,8 @@ function BarToggle(props: { on: boolean; onClick: () => void; children: ReactNod
   );
 }
 
-/** A slider of the bar: beside its label, or in a compact bar behind a
- *  press of the label that opens it. */
-function BarSlider(props: {
-  compact: boolean;
+/** One slider of the bar. */
+interface BarSliderSpec {
   label: string;
   value: number;
   onChange: (value: number) => void;
@@ -171,27 +169,37 @@ function BarSlider(props: {
   max: number;
   step: number;
   shown: string;
-}) {
+}
+
+/** Sliders of the bar: each beside its label, or in a compact bar behind
+ *  one press of the first one's label, which opens them all, each under
+ *  its label where there are more than one. */
+function BarSlider(props: { compact: boolean; sliders: BarSliderSpec[] }) {
   const [at, setAt] = useState<HTMLElement | null>(null);
-  const slider = (
+  const slider = (spec: BarSliderSpec) => (
     <Slider
-      label={props.label}
-      min={props.min}
-      max={props.max}
-      step={props.step}
-      value={props.value}
-      onChange={props.onChange}
-      shown={props.shown}
+      label={spec.label}
+      min={spec.min}
+      max={spec.max}
+      step={spec.step}
+      value={spec.value}
+      onChange={spec.onChange}
+      shown={spec.shown}
     />
   );
   if (!props.compact) {
     return (
-      <span className="is-bar-field">
-        <span className="is-bar-label">{props.label}</span>
-        <div className="is-bar-slider">{slider}</div>
-      </span>
+      <>
+        {props.sliders.map((spec) => (
+          <span key={spec.label} className="is-bar-field">
+            <span className="is-bar-label">{spec.label}</span>
+            <div className="is-bar-slider">{slider(spec)}</div>
+          </span>
+        ))}
+      </>
     );
   }
+  const label = props.sliders[0].label;
   return (
     <>
       <Button
@@ -200,11 +208,20 @@ function BarSlider(props: {
         trailingIcon={<Icon name="arrow-down-s-line" size={14} />}
         onClick={(e) => setAt(e.currentTarget)}
       >
-        {props.label}
+        {label}
       </Button>
       {at && (
-        <Popover anchor={at} placement="bottom-end" label={props.label} onDismiss={() => setAt(null)}>
-          <div className="is-bar-popover">{slider}</div>
+        <Popover anchor={at} placement="bottom-end" label={label} onDismiss={() => setAt(null)}>
+          <div className="is-bar-popover">
+            {props.sliders.length === 1
+              ? slider(props.sliders[0])
+              : props.sliders.map((spec) => (
+                  <div key={spec.label} className="hs-text-field">
+                    <span className="hs-field-label">{spec.label}</span>
+                    {slider(spec)}
+                  </div>
+                ))}
+          </div>
         </Popover>
       )}
     </>
@@ -403,21 +420,33 @@ export function StageBar(props: StageProps) {
     );
   };
 
+  const amountSlider: BarSliderSpec | null =
+    props.amount === null
+      ? null
+      : {
+          label: 'Amount',
+          min: 0.05,
+          max: 1,
+          step: 0.05,
+          value: props.amount,
+          onChange: props.onAmount,
+          shown: `${Math.round(props.amount * 100)}%`,
+        };
+  const brushSlider: BarSliderSpec = {
+    label: 'Brush size',
+    min: 8,
+    max: 160,
+    step: 4,
+    value: props.brushSize,
+    onChange: props.onBrushSize,
+    shown: `${props.brushSize}`,
+  };
   const amount =
-    props.amount !== null &&
+    amountSlider &&
     explained(
       'amount',
       'How far the new picture may move from this one',
-      <BarSlider
-        compact={props.compact}
-        label="Amount"
-        min={0.05}
-        max={1}
-        step={0.05}
-        value={props.amount}
-        onChange={props.onAmount}
-        shown={`${Math.round(props.amount * 100)}%`}
-      />,
+      <BarSlider compact={props.compact} sliders={[amountSlider]} />,
     );
 
   let bar = null;
@@ -430,17 +459,14 @@ export function StageBar(props: StageProps) {
   } else if (isSource && props.tool === 'brush') {
     bar = (
       <>
-        {amount}
-        <BarSlider
-          compact={props.compact}
-          label="Brush size"
-          min={8}
-          max={160}
-          step={4}
-          value={props.brushSize}
-          onChange={props.onBrushSize}
-          shown={`${props.brushSize}`}
-        />
+        {props.narrow && amountSlider ? (
+          <BarSlider compact sliders={[brushSlider, amountSlider]} />
+        ) : (
+          <>
+            {amount}
+            <BarSlider compact={props.compact} sliders={[brushSlider]} />
+          </>
+        )}
         {explained(
           'eraser',
           'Rub out brush strokes',
@@ -490,13 +516,17 @@ export function StageBar(props: StageProps) {
         )}
         <BarSlider
           compact={props.compact}
-          label="Extend by"
-          min={0.1}
-          max={0.5}
-          step={0.05}
-          value={props.sides.share}
-          onChange={(share) => props.onSides({ ...props.sides, share })}
-          shown={`${Math.round(props.sides.share * 100)}%`}
+          sliders={[
+            {
+              label: 'Extend by',
+              min: 0.1,
+              max: 0.5,
+              step: 0.05,
+              value: props.sides.share,
+              onChange: (share) => props.onSides({ ...props.sides, share }),
+              shown: `${Math.round(props.sides.share * 100)}%`,
+            },
+          ]}
         />
         <Button variant="secondary" size="sm" onClick={() => props.onTool('none')}>
           Done
