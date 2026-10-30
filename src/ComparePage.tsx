@@ -5,7 +5,7 @@ import type { Picture, Run } from './records';
 import type { Live } from './runs';
 
 /** The most models one compare runs. */
-export const COMPARE_MOST = 4;
+const COMPARE_MOST = 4;
 
 export interface Column {
   run: Run;
@@ -50,7 +50,10 @@ export function ComparePage(props: {
         {props.columns.length > 0 && (
           <>
             <div className="is-compare-prompt">{props.columns[0].run.prompt}</div>
-            <div className="is-compare-grid" style={{ gridTemplateColumns: `repeat(${props.columns.length}, minmax(0, 1fr))` }}>
+            <div
+              className="is-compare-grid"
+              style={{ gridTemplateColumns: `repeat(${props.columns.length}, minmax(0, 1fr))` }}
+            >
               {props.columns.map(({ run, picture, live }) => (
                 <div key={run.id} className="is-compare-column">
                   <div className="is-compare-head">
@@ -64,21 +67,32 @@ export function ComparePage(props: {
                       </button>
                     ) : live ? (
                       <div className="is-compare-making">
-                        {live.preview ? <img src={assetUrl(live.preview)} alt="The picture so far" /> : <Icon name="image-ai-line" size={28} className="is-making-mark" />}
+                        {live.preview ? (
+                          <img src={assetUrl(live.preview)} alt="The picture so far" />
+                        ) : (
+                          <Icon name="image-ai-line" size={28} className="is-making-mark" />
+                        )}
                         <Meter value={live.fraction} label={`How far ${run.label} is`} />
                         <Button variant="ghost" size="sm" onClick={() => props.onCancel(run.id)}>
                           Cancel
                         </Button>
                       </div>
                     ) : (
-                      <div className="is-compare-failed">{run.error ?? (run.status === 'cancelled' ? 'Cancelled' : 'No picture')}</div>
+                      <div className="is-compare-failed">
+                        {run.error ?? (run.status === 'cancelled' ? 'Cancelled' : 'No picture')}
+                      </div>
                     )}
                   </div>
                   {picture &&
                     (run.model === props.current ? (
                       <Chip tone="ok">In use</Chip>
                     ) : (
-                      <Button variant="secondary" size="sm" icon={<Icon name="check-line" size={14} />} onClick={() => props.onUse(run.model)}>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        icon={<Icon name="check-line" size={14} />}
+                        onClick={() => props.onUse(run.model)}
+                      >
                         Use this model
                       </Button>
                     ))}

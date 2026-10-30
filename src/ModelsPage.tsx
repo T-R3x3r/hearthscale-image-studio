@@ -1,6 +1,16 @@
 import { useEffect, useState } from 'react';
 import type { HubListing, HubRepository, InstallTarget, ModelCard, ModelServer } from '@hearthscale/app';
-import { Button, Chip, Icon, Meter, Notice, PageTitle, SettingsSection, TextInput, useFloatingTips } from '@hearthscale/app-ui';
+import {
+  Button,
+  Chip,
+  Icon,
+  Meter,
+  Notice,
+  PageTitle,
+  SettingsSection,
+  TextInput,
+  useFloatingTips,
+} from '@hearthscale/app-ui';
 import { call, reason } from './bridge';
 import { gigabytes, type Models } from './models';
 
@@ -31,6 +41,7 @@ export function ModelsPage(props: {
   downloads: Downloads;
   current: string | null;
   onUse: (card: string) => void;
+  onInstalled: () => void;
 }) {
   const [servers, setServers] = useState<ModelServer[]>([]);
   const [server, setServer] = useState<string | null>(null);
@@ -44,14 +55,17 @@ export function ModelsPage(props: {
   useEffect(() => {
     void call('hearthscale/models/servers', {}).then(({ servers: list }) => {
       setServers(list);
-      setServer((list.find((s) => s.here && s.status === 'ready') ?? list.find((s) => s.status === 'ready'))?.id ?? null);
+      setServer(
+        (list.find((s) => s.here && s.status === 'ready') ?? list.find((s) => s.status === 'ready'))?.id ?? null,
+      );
     });
   }, []);
 
   const install = async (target: InstallTarget) => {
     setProblem(null);
     try {
-      await call('hearthscale/models/install', { target });
+      const { card } = await call('hearthscale/models/install', { target });
+      if (card) props.onInstalled();
     } catch (error) {
       setProblem(reason(error));
     }
@@ -63,7 +77,11 @@ export function ModelsPage(props: {
     setProblem(null);
     setOpen(null);
     try {
-      const { repositories } = await call('hearthscale/models/discover', { server, task: 'image', search: words.trim() || undefined });
+      const { repositories } = await call('hearthscale/models/discover', {
+        server,
+        task: 'image',
+        search: words.trim() || undefined,
+      });
       setFound(repositories);
     } catch (error) {
       setProblem(reason(error));
@@ -146,7 +164,12 @@ export function ModelsPage(props: {
             <div className="is-model-list">
               {props.models.absentImage.map((card) => (
                 <Row key={card.id} title={card.label} sub={gigabytes(card.sizeBytes)}>
-                  <Button variant="secondary" size="sm" icon={<Icon name="download-2-line" size={14} />} onClick={() => void install(card.id)}>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    icon={<Icon name="download-2-line" size={14} />}
+                    onClick={() => void install(card.id)}
+                  >
                     Install
                   </Button>
                 </Row>
@@ -154,7 +177,12 @@ export function ModelsPage(props: {
               {props.models.absentUpscale.map((card) => (
                 <Row key={card.id} title={card.label} sub={gigabytes(card.sizeBytes)}>
                   <Chip>For Bigger</Chip>
-                  <Button variant="secondary" size="sm" icon={<Icon name="download-2-line" size={14} />} onClick={() => void install(card.id)}>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    icon={<Icon name="download-2-line" size={14} />}
+                    onClick={() => void install(card.id)}
+                  >
                     Install
                   </Button>
                 </Row>
@@ -174,7 +202,13 @@ export function ModelsPage(props: {
               if (e.key === 'Enter') void search();
             }}
           />
-          <Button variant="secondary" size="sm" disabled={busy || !server} icon={<Icon name="search-line" size={14} />} onClick={() => void search()}>
+          <Button
+            variant="secondary"
+            size="sm"
+            disabled={busy || !server}
+            icon={<Icon name="search-line" size={14} />}
+            onClick={() => void search()}
+          >
             Search
           </Button>
         </div>
@@ -202,7 +236,9 @@ export function ModelsPage(props: {
                 </Row>
                 {open?.repo === repo.repo && (
                   <div className="is-model-files">
-                    {open.candidates.length === 0 && <div className="is-model-none">No file here runs on this Server</div>}
+                    {open.candidates.length === 0 && (
+                      <div className="is-model-none">No file here runs on this Server</div>
+                    )}
                     {open.candidates.map((file) => {
                       const why =
                         file.reason ??

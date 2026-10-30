@@ -14,7 +14,11 @@ function dayLabel(made: number, locale: string): string {
   const days = Math.round((start(today) - start(day)) / 86_400_000);
   if (days === 0) return 'Today';
   if (days === 1) return 'Yesterday';
-  return day.toLocaleDateString(locale, { day: 'numeric', month: 'long', year: day.getFullYear() === today.getFullYear() ? undefined : 'numeric' });
+  return day.toLocaleDateString(locale, {
+    day: 'numeric',
+    month: 'long',
+    year: day.getFullYear() === today.getFullYear() ? undefined : 'numeric',
+  });
 }
 
 /** The rows of the library: a heading for each day, then its pictures. */
@@ -61,11 +65,19 @@ export function Library(props: {
           New picture
         </Button>
         <nav className="is-library-nav">
-          <button className="is-nav-row" data-on={props.page === 'studio' && !props.favourites} onClick={() => (props.onFavourites(false), props.onPage('studio'))}>
+          <button
+            className="is-nav-row"
+            data-on={props.page === 'studio' && !props.favourites}
+            onClick={() => (props.onFavourites(false), props.onPage('studio'))}
+          >
             <Icon name="gallery-line" size={16} />
             All pictures
           </button>
-          <button className="is-nav-row" data-on={props.page === 'studio' && props.favourites} onClick={() => (props.onFavourites(true), props.onPage('studio'))}>
+          <button
+            className="is-nav-row"
+            data-on={props.page === 'studio' && props.favourites}
+            onClick={() => (props.onFavourites(true), props.onPage('studio'))}
+          >
             <Icon name="heart-line" size={16} />
             Favourites
           </button>
@@ -78,10 +90,17 @@ export function Library(props: {
             Get models
           </button>
         </nav>
-        <TextInput value={props.words} placeholder="Search" aria-label="Search pictures" onChange={(e) => props.onWords(e.target.value)} />
+        <TextInput
+          value={props.words}
+          placeholder="Search"
+          aria-label="Search pictures"
+          onChange={(e) => props.onWords(e.target.value)}
+        />
       </div>
       {rows.length === 0 ? (
-        <div className="is-library-empty">{props.words || props.favourites ? 'No pictures match' : 'No pictures yet'}</div>
+        <div className="is-library-empty">
+          {props.words || props.favourites ? 'No pictures match' : 'No pictures yet'}
+        </div>
       ) : (
         <VirtualList
           className="is-library-list"

@@ -42,7 +42,6 @@ export interface PictureActions {
   favourite: () => void;
   save: () => void;
   copy: () => void;
-  folder: () => void;
   large: () => void;
   settings: () => void;
   remove: () => void;
@@ -73,6 +72,8 @@ function Brush(props: {
   height: number;
   size: number;
   erase: boolean;
+  /** Whether the brush paints; the strokes stay in sight either way. */
+  active: boolean;
   onPaint: () => void;
 }) {
   const last = useRef<{ x: number; y: number } | null>(null);
@@ -114,6 +115,7 @@ function Brush(props: {
     <canvas
       ref={props.strokes}
       className="is-strokes"
+      data-active={props.active}
       onPointerDown={(event) => {
         event.currentTarget.setPointerCapture(event.pointerId);
         last.current = null;
@@ -146,6 +148,7 @@ export function Stage(props: {
   onBrushSize: (size: number) => void;
   erasing: boolean;
   onErasing: (on: boolean) => void;
+  painted: boolean;
   onPaint: () => void;
   onClearStrokes: () => void;
   sides: Sides;
@@ -160,32 +163,55 @@ export function Stage(props: {
   const tips = useFloatingTips('top');
   const { picture, size, margins } = props;
   const isSource = !!picture && picture.id === props.source?.id;
-  const framed = size && margins ? { width: size.width + margins.left + margins.right, height: size.height + margins.top + margins.bottom } : size;
+  const framed =
+    size && margins
+      ? { width: size.width + margins.left + margins.right, height: size.height + margins.top + margins.bottom }
+      : size;
   const box = useFit(area, framed?.width ?? 0, framed?.height ?? 0);
 
   let body;
   if (props.comparing && picture && props.sourceOf) {
     body = (
       <div className="is-compare-one">
-        <PictureCompare before={{ src: fileUrl(props.sourceOf.path), name: 'Before' }} after={{ src: fileUrl(picture.path), name: 'After' }} />
+        <PictureCompare
+          before={{ src: fileUrl(props.sourceOf.path), name: 'Before' }}
+          after={{ src: fileUrl(picture.path), name: 'After' }}
+        />
       </div>
     );
   } else if (picture && size && framed) {
     const scale = box.width / framed.width;
     body = (
-      <div className="is-frame" style={{ width: box.width, height: box.height }} data-extend={props.tool === 'extend' && !!margins}>
+      <div
+        className="is-frame"
+        style={{ width: box.width, height: box.height }}
+        data-extend={props.tool === 'extend' && !!margins}
+      >
         <img
           className="is-picture"
           src={fileUrl(picture.path)}
           alt={picture.prompt}
           style={
             margins
-              ? { left: margins.left * scale, top: margins.top * scale, width: size.width * scale, height: size.height * scale }
+              ? {
+                  left: margins.left * scale,
+                  top: margins.top * scale,
+                  width: size.width * scale,
+                  height: size.height * scale,
+                }
               : undefined
           }
         />
-        {props.tool === 'brush' && isSource && (
-          <Brush strokes={props.strokes} width={size.width} height={size.height} size={props.brushSize} erase={props.erasing} onPaint={props.onPaint} />
+        {(props.tool === 'brush' || props.painted) && isSource && (
+          <Brush
+            strokes={props.strokes}
+            width={size.width}
+            height={size.height}
+            size={props.brushSize}
+            erase={props.erasing}
+            active={props.tool === 'brush'}
+            onPaint={props.onPaint}
+          />
         )}
       </div>
     );
@@ -240,7 +266,15 @@ export function Stage(props: {
       <>
         <span className="is-bar-label">Brush size</span>
         <div className="is-bar-slider">
-          <Slider label="Brush size" min={8} max={160} step={4} value={props.brushSize} onChange={props.onBrushSize} shown={`${props.brushSize}`} />
+          <Slider
+            label="Brush size"
+            min={8}
+            max={160}
+            step={4}
+            value={props.brushSize}
+            onChange={props.onBrushSize}
+            shown={`${props.brushSize}`}
+          />
         </div>
         <Chip selected={props.erasing} onClick={() => props.onErasing(!props.erasing)}>
           Rub out
@@ -254,7 +288,8 @@ export function Stage(props: {
       </>
     );
   } else if (isSource && props.tool === 'extend') {
-    const flip = (side: 'left' | 'right' | 'top' | 'bottom') => props.onSides({ ...props.sides, [side]: !props.sides[side] });
+    const flip = (side: 'left' | 'right' | 'top' | 'bottom') =>
+      props.onSides({ ...props.sides, [side]: !props.sides[side] });
     bar = (
       <>
         {(['left', 'right', 'top', 'bottom'] as const).map((side) => (
@@ -282,10 +317,20 @@ export function Stage(props: {
   } else if (isSource) {
     bar = (
       <>
-        <Button variant="secondary" size="sm" icon={<Icon name="paint-brush-line" size={14} />} onClick={() => props.onTool('brush')}>
+        <Button
+          variant="secondary"
+          size="sm"
+          icon={<Icon name="paint-brush-line" size={14} />}
+          onClick={() => props.onTool('brush')}
+        >
           Brush
         </Button>
-        <Button variant="secondary" size="sm" icon={<Icon name="expand-diagonal-line" size={14} />} onClick={() => props.onTool('extend')}>
+        <Button
+          variant="secondary"
+          size="sm"
+          icon={<Icon name="expand-diagonal-line" size={14} />}
+          onClick={() => props.onTool('extend')}
+        >
           Extend
         </Button>
         <Button variant="ghost" size="sm" icon={<Icon name="close-line" size={14} />} onClick={props.onStopEditing}>
@@ -305,7 +350,13 @@ export function Stage(props: {
           </Button>
         )}
         {actions.vary && (
-          <Button variant="secondary" size="sm" icon={<Icon name="shuffle-line" size={14} />} trailingIcon={<Icon name="arrow-down-s-line" size={14} />} onClick={(e) => setVaryMenu(anchorFrom('vary', e))}>
+          <Button
+            variant="secondary"
+            size="sm"
+            icon={<Icon name="shuffle-line" size={14} />}
+            trailingIcon={<Icon name="arrow-down-s-line" size={14} />}
+            onClick={(e) => setVaryMenu(anchorFrom('vary', e))}
+          >
             Vary
           </Button>
         )}
@@ -315,7 +366,10 @@ export function Stage(props: {
           </Button>
         )}
         <span {...favourite.hover} className="is-tipwrap">
-          <IconButton aria-label={picture.favourite ? 'Remove from favourites' : 'Add to favourites'} onClick={actions.favourite}>
+          <IconButton
+            aria-label={picture.favourite ? 'Remove from favourites' : 'Add to favourites'}
+            onClick={actions.favourite}
+          >
             <Icon name={picture.favourite ? 'heart-fill' : 'heart-line'} size={16} />
           </IconButton>
           {favourite.tip}
@@ -350,15 +404,49 @@ export function Stage(props: {
       )}
       {menu && actions && (
         <MenuSurface anchor={menu} dir="up" onDismiss={() => setMenu(null)}>
-          {actions.addToPrompt && <MItem icon={<Icon name="image-add-line" size={14} />} label="Add to the prompt" onClick={() => (setMenu(null), actions.addToPrompt!())} />}
-          {actions.plainBackground && <MItem icon={<Icon name="scissors-cut-line" size={14} />} label="Remove background" onClick={() => (setMenu(null), actions.plainBackground!())} />}
-          {actions.compareSource && <MItem icon={<Icon name="contrast-2-line" size={14} />} label="Compare with the picture before" onClick={() => (setMenu(null), actions.compareSource!())} />}
-          <MItem icon={<Icon name="fullscreen-line" size={14} />} label="View large" onClick={() => (setMenu(null), actions.large())} />
-          <MItem icon={<Icon name="file-copy-line" size={14} />} label="Copy" onClick={() => (setMenu(null), actions.copy())} />
-          <MItem icon={<Icon name="folder-open-line" size={14} />} label="Show in folder" onClick={() => (setMenu(null), actions.folder())} />
-          <MItem icon={<Icon name="restart-line" size={14} />} label="Use these settings" onClick={() => (setMenu(null), actions.settings())} />
+          {actions.addToPrompt && (
+            <MItem
+              icon={<Icon name="image-add-line" size={14} />}
+              label="Add to the prompt"
+              onClick={() => (setMenu(null), actions.addToPrompt!())}
+            />
+          )}
+          {actions.plainBackground && (
+            <MItem
+              icon={<Icon name="scissors-cut-line" size={14} />}
+              label="Remove background"
+              onClick={() => (setMenu(null), actions.plainBackground!())}
+            />
+          )}
+          {actions.compareSource && (
+            <MItem
+              icon={<Icon name="contrast-2-line" size={14} />}
+              label="Compare with the picture before"
+              onClick={() => (setMenu(null), actions.compareSource!())}
+            />
+          )}
+          <MItem
+            icon={<Icon name="fullscreen-line" size={14} />}
+            label="View large"
+            onClick={() => (setMenu(null), actions.large())}
+          />
+          <MItem
+            icon={<Icon name="file-copy-line" size={14} />}
+            label="Copy"
+            onClick={() => (setMenu(null), actions.copy())}
+          />
+          <MItem
+            icon={<Icon name="restart-line" size={14} />}
+            label="Use these settings"
+            onClick={() => (setMenu(null), actions.settings())}
+          />
           <MDivider />
-          <MItem icon={<Icon name="delete-bin-line" size={14} />} label="Delete" danger onClick={() => (setMenu(null), actions.remove())} />
+          <MItem
+            icon={<Icon name="delete-bin-line" size={14} />}
+            label="Delete"
+            danger
+            onClick={() => (setMenu(null), actions.remove())}
+          />
         </MenuSurface>
       )}
     </div>

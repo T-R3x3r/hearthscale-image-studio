@@ -61,17 +61,23 @@ async function release(run: Run) {
 async function fail(run: Run, outcome: 'failed' | 'cancelled', error: string | null) {
   if (settled.has(run.id)) return;
   settled.add(run.id);
-  await updateRun(run.id, { status: outcome, error, finished: Date.now() });
-  await release(run);
-  ended(run.id, outcome, error ?? undefined);
+  try {
+    await updateRun(run.id, { status: outcome, error, finished: Date.now() });
+    await release(run);
+  } finally {
+    ended(run.id, outcome, error ?? undefined);
+  }
 }
 
 async function complete(run: Run, pictures: { path: string; seed: number | null }[]) {
   if (settled.has(run.id)) return;
   settled.add(run.id);
-  await finishRun(run, pictures, Date.now());
-  await release(run);
-  ended(run.id, 'done');
+  try {
+    await finishRun(run, pictures, Date.now());
+    await release(run);
+  } finally {
+    ended(run.id, 'done');
+  }
 }
 
 async function apply(job: Job) {
@@ -103,6 +109,7 @@ async function apply(job: Job) {
   if (!now.started && job.status === 'running' && !job.waiting) {
     now.started = Date.now();
     await updateRun(run.id, { started: now.started });
+    if (settled.has(run.id)) return;
   }
   live.set(run.id, now);
   changed();
@@ -115,7 +122,15 @@ on('hearthscale/jobs/progress', ({ job }) => void apply(job));
 export async function startRun(run: Run, input: Record<string, unknown>, label: string): Promise<void> {
   await addRun(run);
   runs.set(run.id, run);
-  live.set(run.id, { status: 'queued', fraction: 0, phase: null, preview: null, waiting: null, started: null, job: null });
+  live.set(run.id, {
+    status: 'queued',
+    fraction: 0,
+    phase: null,
+    preview: null,
+    waiting: null,
+    started: null,
+    job: null,
+  });
   changed();
   let job: Job;
   try {
@@ -125,21 +140,30 @@ export async function startRun(run: Run, input: Record<string, unknown>, label: 
     return;
   }
   byJob.set(job.id, run.id);
-  await updateRun(run.id, { job: job.id });
+  if (cancelling.delete(run.id)) await call('hearthscale/jobs/cancel', { id: job.id });
   await apply(job);
   await apply((await call('hearthscale/jobs/get', { id: job.id })).job);
 }
 
+/** Runs the person cancelled before their job had an id. */
+const cancelling = new Set<string>();
+
 export async function cancelRun(run: string): Promise<void> {
   const job = live.get(run)?.job;
   if (job) await call('hearthscale/jobs/cancel', { id: job });
+  else cancelling.add(run);
 }
+
+/** How long a run's job may take to get its id before the run counts as lost. */
+const SUBMITTING_MS = 120_000;
 
 /** Picks up the runs that were still making when the view last closed:
  *  a job Hearthscale still holds is followed, and a run whose job it no
- *  longer knows keeps the pictures its folder holds. */
+ *  longer knows keeps the pictures its folder holds. A run still waiting
+ *  for its job's id is left to the view that submits it. */
 export async function recoverRuns(): Promise<void> {
   for (const run of await makingRuns()) {
+    if (runs.has(run.id) || (!run.job && Date.now() - run.made < SUBMITTING_MS)) continue;
     runs.set(run.id, run);
     if (run.job) {
       byJob.set(run.job, run.id);
@@ -154,7 +178,10 @@ export async function recoverRuns(): Promise<void> {
       const { files } = await call('hearthscale/fs/list', { path: dataPath(`pictures/${run.id}`) });
       const kept = files.filter((name) => name.endsWith('.png')).sort();
       if (kept.length > 0) {
-        await complete(run, kept.map((name) => ({ path: `pictures/${run.id}/${name}`, seed: null })));
+        await complete(
+          run,
+          kept.map((name) => ({ path: `pictures/${run.id}/${name}`, seed: null })),
+        );
         continue;
       }
     } catch {

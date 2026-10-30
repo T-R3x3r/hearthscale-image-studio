@@ -1,7 +1,17 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ChatMessage, ModelCard } from '@hearthscale/app';
-import { Button, Icon, IconButton, Lightbox, Meter, Notice, ShellConfirm, Toast, useFloatingTips } from '@hearthscale/app-ui';
-import { call, dataPath, download, fileUrl, hostContext, on, reason, tool } from './bridge';
+import {
+  Button,
+  Icon,
+  IconButton,
+  Lightbox,
+  Meter,
+  Notice,
+  ShellConfirm,
+  Toast,
+  useFloatingTips,
+} from '@hearthscale/app-ui';
+import { call, download, fileUrl, hostContext, on, reason, tool } from './bridge';
 import {
   addRun,
   finishRun,
@@ -19,7 +29,7 @@ import {
   type Run,
 } from './records';
 import { abilitiesOf, onDownload, readModels, type Abilities, type Models } from './models';
-import { blobOf, extendUploads, fileName, marginsOf, maskUpload, preparedUpload, sizeOf } from './pictures';
+import { blobOf, extended, fileName, marginsOf, maskOf, prepared, sizeOf, upload } from './pictures';
 import {
   dimensions,
   ERASE_WORDS,
@@ -110,7 +120,19 @@ function shared(abilities: Abilities, advanced: Advanced, avoid: string, count: 
   if (abilities.guidance && guidance !== null) input.guidance = Math.min(Math.max(guidance, 0), 100);
   if (abilities.seed && seed !== null) input.seed = Math.min(seed, 4294967295 - pictures + 1);
   if (pictures > 1) input.count = pictures;
-  return { input, negative, steps: abilities.steps ? steps : null, guidance: abilities.guidance ? guidance : null, seed: abilities.seed ? seed : null, count: pictures };
+  return {
+    input,
+    negative,
+    steps: abilities.steps ? steps : null,
+    guidance: abilities.guidance ? guidance : null,
+    seed: abilities.seed ? seed : null,
+    count: pictures,
+  };
+}
+
+/** The size of a job, where the model's schema takes one. */
+function sized(abilities: Abilities, width: number, height: number) {
+  return abilities.size ? { width, height } : {};
 }
 
 /** Collects a streamed completion of the app's chat model. */
@@ -128,7 +150,10 @@ async function complete(content: ChatMessage['content'], system: string | null):
     await call('hearthscale/models/complete', {
       stream,
       request: {
-        messages: [...(system ? [{ role: 'system' as const, content: system }] : []), { role: 'user' as const, content }],
+        messages: [
+          ...(system ? [{ role: 'system' as const, content: system }] : []),
+          { role: 'user' as const, content },
+        ],
         reasoning: 'none',
         sampling: { maxTokens: 200 },
       },
@@ -137,7 +162,10 @@ async function complete(content: ChatMessage['content'], system: string | null):
     stop();
   }
   if (failure) throw new Error(failure);
-  return text.replace(/<think>[\s\S]*?<\/think>/g, '').trim().replace(/^["']|["']$/g, '');
+  return text
+    .replace(/<think>[\s\S]*?<\/think>/g, '')
+    .trim()
+    .replace(/^["']|["']$/g, '');
 }
 
 export function Studio() {
@@ -203,7 +231,9 @@ export function Studio() {
   const loadCompare = useCallback(async (set: string | null) => {
     if (!set) return setCompareRuns([]);
     const runs = await runsOfCompare(set);
-    setCompareRuns(await Promise.all(runs.map(async (run) => ({ run, picture: (await picturesOfRun(run.id))[0] ?? null }))));
+    setCompareRuns(
+      await Promise.all(runs.map(async (run) => ({ run, picture: (await picturesOfRun(run.id))[0] ?? null }))),
+    );
   }, []);
 
   const show = useCallback(async (picture: Picture | null) => {
@@ -278,7 +308,11 @@ export function Studio() {
       if (current) shownBlob.current = { path: shown.path, blob };
     });
     void getRun(shown.run).then(async (run) => {
-      if (current && run?.source) setShownFrom(await getPicture(run.source));
+      const from = run?.source ? await getPicture(run.source) : null;
+      if (!current || !from) return;
+      const [before, after] = await Promise.all([sizeOf(from.path), sizeOf(shown.path)]);
+      const sameShape = Math.abs(before.width / before.height - after.width / after.height) < 0.01;
+      if (current && sameShape) setShownFrom(from);
     });
     return () => {
       current = false;
@@ -307,9 +341,12 @@ export function Studio() {
 
   const imageCards = models?.image ?? [];
   const model: ModelCard | null =
-    imageCards.find((card) => card.id === prefs.model) ?? imageCards.find((card) => card.id === models?.chosen) ?? imageCards[0] ?? null;
+    imageCards.find((card) => card.id === prefs.model) ??
+    imageCards.find((card) => card.id === models?.chosen) ??
+    imageCards[0] ??
+    null;
   const abilities = abilitiesOf(model ?? undefined);
-  const upscaler = models?.upscale[0] ?? null;
+  const upscaler = models?.upscale.find((card) => card.id === models.upscaleChosen) ?? models?.upscale[0] ?? null;
   const chat = models?.chat ?? null;
   const editing = !!source && page === 'studio';
   const extending = editing && currentTool === 'extend' && (sides.left || sides.right || sides.top || sides.bottom);
@@ -317,8 +354,8 @@ export function Studio() {
   let action: Action | 'compare';
   if (page === 'compare') action = 'compare';
   else if (!editing) action = 'make';
-  else if (currentTool === 'brush' && painted) action = words.trim() ? 'fill' : 'erase';
   else if (extending) action = 'extend';
+  else if (painted) action = words.trim() ? 'fill' : 'erase';
   else action = abilities.edit && (mode === 'edit' || !abilities.change) ? 'edit' : 'change';
 
   const ready = (() => {
@@ -390,7 +427,7 @@ export function Studio() {
       seed: settings.seed,
       count: settings.count,
     });
-    await begin(run, { prompt, width, height, ...settings.input });
+    await begin(run, { prompt, ...sized(abilities, width, height), ...settings.input });
   }
 
   async function change(kind: Action, from: Picture = source!, strength = amount, prompt = words.trim()) {
@@ -398,27 +435,42 @@ export function Studio() {
     const styled = withStyle(prompt || from.prompt, kind === 'erase' || kind === 'extend' ? null : prefs.style);
     const settings = shared(abilities, advanced, styled.avoid, kind === 'extend' || kind === 'erase' ? 1 : prefs.count);
     let input: Record<string, unknown>;
-    let inputs: string[];
+    const inputs: string[] = [];
     let width = size.width;
     let height = size.height;
-    if (kind === 'edit') {
-      const extra = from.id === source?.id ? references : [];
-      inputs = await hold([from.path, ...extra.map((r) => r.path)]);
-      input = { prompt: styled.prompt, references: inputs };
-    } else if (kind === 'change') {
-      inputs = await hold([from.path]);
-      input = { prompt: styled.prompt, image: inputs[0], strength };
-    } else if (kind === 'fill' || kind === 'erase') {
-      const [image] = await hold([from.path]);
-      const mask = await maskUpload(strokes.current!);
-      inputs = [image, mask];
-      input = { prompt: kind === 'erase' ? ERASE_WORDS : styled.prompt, image, mask, strength: kind === 'erase' ? 1 : strength };
-    } else {
-      const extended = await extendUploads(from.path, marginsOf(size, sides, sides.share));
-      inputs = [extended.image, extended.mask];
-      width = extended.width;
-      height = extended.height;
-      input = { prompt: styled.prompt || 'the rest of the scene', image: extended.image, mask: extended.mask, strength: 1 };
+    try {
+      if (kind === 'edit') {
+        const extra = from.id === source?.id ? references : [];
+        inputs.push(...(await hold([from.path, ...extra.map((r) => r.path)])));
+        input = { prompt: styled.prompt, references: [...inputs] };
+      } else if (kind === 'change') {
+        inputs.push(...(await hold([from.path])));
+        input = { prompt: styled.prompt, image: inputs[0], strength };
+      } else if (kind === 'fill' || kind === 'erase') {
+        inputs.push(...(await hold([from.path])));
+        inputs.push(await upload('mask.png', await maskOf(strokes.current!)));
+        input = {
+          prompt: kind === 'erase' ? ERASE_WORDS : styled.prompt,
+          image: inputs[0],
+          mask: inputs[1],
+          strength: kind === 'erase' ? 1 : strength,
+        };
+      } else {
+        const grown = await extended(from.path, marginsOf(size, sides, sides.share));
+        inputs.push(await upload('extended.png', grown.image));
+        inputs.push(await upload('mask.png', grown.mask));
+        width = grown.width;
+        height = grown.height;
+        input = {
+          prompt: styled.prompt || 'the rest of the scene',
+          image: inputs[0],
+          mask: inputs[1],
+          strength: 1,
+        };
+      }
+    } catch (error) {
+      if (inputs.length) await tool('release', { assets: inputs });
+      throw error;
     }
     const run = newRun({
       kind: 'image',
@@ -438,7 +490,7 @@ export function Studio() {
       source: from.id,
       inputs,
     });
-    await begin(run, { ...input, width, height, ...settings.input });
+    await begin(run, { ...input, ...sized(abilities, width, height), ...settings.input });
     if (kind === 'fill' || kind === 'erase' || kind === 'extend') {
       setTool('none');
       setPainted(false);
@@ -469,7 +521,7 @@ export function Studio() {
         seed: settings.seed,
         compare: set,
       });
-      await startRun(run, { prompt, width, height, ...settings.input }, LABELS.compare);
+      await startRun(run, { prompt, ...sized(abilitiesOf(card), width, height), ...settings.input }, LABELS.compare);
       await loadCompare(set);
     }
   }
@@ -479,25 +531,58 @@ export function Studio() {
     if (!run || !model) return;
     const card = imageCards.find((c) => c.id === run.model) ?? model;
     const styled = withStyle(run.prompt, run.style);
-    const settings = shared(abilitiesOf(card), { negative: '', steps: run.steps ? String(run.steps) : '', guidance: run.guidance !== null ? String(run.guidance) : '', seed: '' }, run.negative, run.count);
-    const next = newRun({ ...run, id: newId(), made: Date.now(), model: card.id, label: card.label, seed: null, job: null, inputs: [], status: 'making', error: null, started: null, finished: null, compare: null });
-    await begin(next, { prompt: styled.prompt, width: run.width, height: run.height, ...settings.input });
+    const settings = shared(
+      abilitiesOf(card),
+      {
+        negative: '',
+        steps: run.steps ? String(run.steps) : '',
+        guidance: run.guidance !== null ? String(run.guidance) : '',
+        seed: '',
+      },
+      run.negative,
+      run.count,
+    );
+    const next = newRun({
+      ...run,
+      id: newId(),
+      made: Date.now(),
+      model: card.id,
+      label: card.label,
+      seed: null,
+      job: null,
+      inputs: [],
+      status: 'making',
+      error: null,
+      started: null,
+      finished: null,
+      compare: null,
+    });
+    const sizes = run.width && run.height ? sized(abilitiesOf(card), run.width, run.height) : {};
+    await begin(next, { prompt: styled.prompt, ...sizes, ...settings.input });
   }
 
   async function bigger(picture: Picture) {
     if (!upscaler) return setPage('models');
     const inputs = await hold([picture.path]);
-    const run = newRun({ kind: 'upscale', action: 'bigger', model: upscaler.id, label: upscaler.label, prompt: picture.prompt, source: picture.id, inputs });
+    const run = newRun({
+      kind: 'upscale',
+      action: 'bigger',
+      model: upscaler.id,
+      label: upscaler.label,
+      prompt: picture.prompt,
+      source: picture.id,
+      inputs,
+    });
     await begin(run, { image: inputs[0] });
   }
 
   async function openFile(file: Blob) {
     setProblem(null);
     try {
-      const asset = await preparedUpload(file);
+      const asset = await upload('picture.png', await prepared(file));
       const run = newRun({ kind: 'opened', action: 'open', model: '', label: '', status: 'done' });
-      await addRun({ ...run, status: 'making' });
       const { path } = await tool<{ path: string }>('keep', { asset, run: run.id }, 'Open picture');
+      await addRun(run);
       await finishRun(run, [{ path, seed: null }], Date.now());
       const picture = (await picturesOfRun(run.id))[0];
       await refreshLibrary();
@@ -533,7 +618,13 @@ export function Studio() {
     let assets: string[] = [];
     try {
       assets = await hold([picture.path]);
-      const text = await complete([{ type: 'image', asset: assets[0], mediaType: 'image/png' }, { type: 'text', text: DESCRIBE }], null);
+      const text = await complete(
+        [
+          { type: 'image', asset: assets[0], mediaType: 'image/png' },
+          { type: 'text', text: DESCRIBE },
+        ],
+        null,
+      );
       if (text) setWords(text);
     } catch (error) {
       setProblem(reason(error));
@@ -562,7 +653,11 @@ export function Studio() {
         return d.width === run.width && d.height === run.height;
       },
     );
-    setPrefs({ style: run.style, ...(fit ?? {}), ...(imageCards.some((c) => c.id === run.model) ? { model: run.model } : {}) });
+    setPrefs({
+      style: run.style,
+      ...(fit ?? {}),
+      ...(imageCards.some((c) => c.id === run.model) ? { model: run.model } : {}),
+    });
   }
 
   async function saveAs(picture: Picture) {
@@ -576,14 +671,6 @@ export function Studio() {
       const kept = shownBlob.current?.path === picture.path ? shownBlob.current.blob : await blobOf(picture.path);
       await navigator.clipboard.write([new ClipboardItem({ 'image/png': kept })]);
       setToast({ text: 'Copied' });
-    } catch (error) {
-      setProblem(reason(error));
-    }
-  }
-
-  async function showFolder(picture: Picture) {
-    try {
-      await call('openai/files/open', { path: dataPath(`pictures/${picture.run}`) });
     } catch (error) {
       setProblem(reason(error));
     }
@@ -615,28 +702,46 @@ export function Studio() {
 
   const actions: PictureActions | null = shown
     ? {
-        edit: abilities.change || abilities.edit ? () => (setSource(shown), setReferences([]), setWords('')) : undefined,
+        edit:
+          abilities.change || abilities.edit ? () => (setSource(shown), setReferences([]), setWords('')) : undefined,
         addToPrompt:
-          source && abilities.edit && source.id !== shown.id && !references.some((r) => r.id === shown.id) && references.length < 9
+          source &&
+          abilities.edit &&
+          source.id !== shown.id &&
+          !references.some((r) => r.id === shown.id) &&
+          references.length < 9
             ? () => setReferences((before) => [...before, shown])
             : undefined,
-        vary: abilities.change ? (how) => void change('change', shown, VARY[how], shown.prompt).catch((e) => setProblem(reason(e))) : undefined,
-        bigger: upscaler || (models?.absentUpscale.length ?? 0) > 0 ? () => void bigger(shown).catch((e) => setProblem(reason(e))) : undefined,
-        plainBackground: abilities.edit ? () => void change('edit', shown, 1, PLAIN_BACKGROUND_WORDS).catch((e) => setProblem(reason(e))) : undefined,
+        vary: abilities.change
+          ? (how) => void change('change', shown, VARY[how], shown.prompt).catch((e) => setProblem(reason(e)))
+          : undefined,
+        bigger:
+          upscaler || (models?.absentUpscale.length ?? 0) > 0
+            ? () => void bigger(shown).catch((e) => setProblem(reason(e)))
+            : undefined,
+        plainBackground: abilities.edit
+          ? () => void change('edit', shown, 1, PLAIN_BACKGROUND_WORDS).catch((e) => setProblem(reason(e)))
+          : undefined,
         compareSource: shownFrom ? () => setComparing(true) : undefined,
         favourite: () => void toggleFavourite(shown),
         save: () => void saveAs(shown),
         copy: () => void copy(shown),
-        folder: () => void showFolder(shown),
-        large: () => setLarge(Math.max(0, strip.findIndex((p) => p.id === shown.id))),
+        large: () =>
+          setLarge(
+            Math.max(
+              0,
+              strip.findIndex((p) => p.id === shown.id),
+            ),
+          ),
         settings: () => void useSettings(shown),
         remove: () => setDeleting(shown),
       }
     : null;
 
-  const stripLive = stripRun ? live.get(stripRun.id) ?? null : null;
-  const margins = editing && currentTool === 'extend' && sourceSize && extending ? marginsOf(sourceSize, sides, sides.share) : null;
-  const stagePicture = editing && currentTool !== 'none' ? source : shown;
+  const stripLive = stripRun ? (live.get(stripRun.id) ?? null) : null;
+  const margins =
+    editing && currentTool === 'extend' && sourceSize && extending ? marginsOf(sourceSize, sides, sides.share) : null;
+  const stagePicture = editing && (currentTool !== 'none' || painted) ? source : shown;
   const stageSize = stagePicture && stagePicture.id === source?.id && sourceSize ? sourceSize : shownSize;
   const columns: Column[] = compareRuns.map(({ run, picture }) => ({ run, picture, live: live.get(run.id) ?? null }));
   const fold = tips('fold', folded ? 'Show the library' : 'Hide the library');
@@ -695,7 +800,11 @@ export function Studio() {
               comparing={comparing}
               onStopCompare={() => setComparing(false)}
               live={stripLive}
-              liveLabel={stripRun ? `${stripRun.action === 'make' ? 'Making' : stripRun.action === 'bigger' ? 'Making it bigger' : 'Changing'} with ${stripRun.label}` : ''}
+              liveLabel={
+                stripRun
+                  ? `${stripRun.action === 'make' ? 'Making' : stripRun.action === 'bigger' ? 'Making it bigger' : 'Changing'} with ${stripRun.label}`
+                  : ''
+              }
               noModel={!!models && imageCards.length === 0}
               onGetModels={() => setPage('models')}
               onIdea={setWords}
@@ -709,6 +818,7 @@ export function Studio() {
               onBrushSize={setBrushSize}
               erasing={erasing}
               onErasing={setErasing}
+              painted={painted}
               onPaint={() => setPainted(true)}
               onClearStrokes={() => {
                 const canvas = strokes.current;
@@ -724,10 +834,15 @@ export function Studio() {
                 setReferences([]);
               }}
             />
-            {stripRun && (strip.length > 0 || stripLive) && (
+            {stripRun && (stripLive || strip.length > 1 || (stripRun.action === 'make' && strip.length > 0)) && (
               <div className="is-strip">
                 {strip.map((picture) => (
-                  <button key={picture.id} className="is-strip-item" data-on={picture.id === shown?.id} onClick={() => void show(picture)}>
+                  <button
+                    key={picture.id}
+                    className="is-strip-item"
+                    data-on={picture.id === shown?.id}
+                    onClick={() => void show(picture)}
+                  >
                     <img src={fileUrl(picture.path)} alt={picture.prompt} />
                   </button>
                 ))}
@@ -738,13 +853,23 @@ export function Studio() {
                     </div>
                   ))}
                 {stripLive ? (
-                  <Button variant="ghost" size="sm" icon={<Icon name="stop-line" size={14} />} onClick={() => void cancelRun(stripRun.id)}>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    icon={<Icon name="stop-line" size={14} />}
+                    onClick={() => void cancelRun(stripRun.id)}
+                  >
                     Cancel
                   </Button>
                 ) : (
                   stripRun.action === 'make' &&
                   imageCards.some((c) => c.id === stripRun.model) && (
-                    <Button variant="ghost" size="sm" icon={<Icon name="add-line" size={14} />} onClick={() => void more().catch((e) => setProblem(reason(e)))}>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      icon={<Icon name="add-line" size={14} />}
+                      onClick={() => void more().catch((e) => setProblem(reason(e)))}
+                    >
                       More
                     </Button>
                   )
@@ -766,7 +891,13 @@ export function Studio() {
           />
         )}
         {page === 'models' && models && (
-          <ModelsPage models={models} downloads={downloads} current={model?.id ?? null} onUse={(card) => (setPrefs({ model: card }), setPage('studio'))} />
+          <ModelsPage
+            models={models}
+            downloads={downloads}
+            current={model?.id ?? null}
+            onUse={(card) => (setPrefs({ model: card }), setPage('studio'))}
+            onInstalled={() => void refreshModels()}
+          />
         )}
         {page !== 'models' && (
           <div className="is-dock">
@@ -809,16 +940,26 @@ export function Studio() {
               onStyle={(style) => setPrefs({ style })}
               count={Math.min(prefs.count, abilities.count)}
               onCount={(count) => setPrefs({ count })}
-              showCount={action !== 'erase' && action !== 'extend'}
+              showCount={action !== 'erase' && action !== 'extend' && action !== 'compare'}
+              comparing={action === 'compare'}
               advanced={advanced}
               onAdvanced={setAdvanced}
               mode={mode}
               onMode={setMode}
-              showMode={editing && abilities.edit && abilities.change && action !== 'fill' && action !== 'erase' && action !== 'extend'}
+              showMode={
+                editing &&
+                abilities.edit &&
+                abilities.change &&
+                action !== 'fill' &&
+                action !== 'erase' &&
+                action !== 'extend'
+              }
               amount={action === 'change' || action === 'fill' ? amount : null}
               onAmount={setAmount}
               onImprove={chat ? () => void improve() : null}
-              onDescribe={chat?.vision && (editing ? source : shown) ? () => void describe((editing ? source : shown)!) : null}
+              onDescribe={
+                chat?.vision && (editing ? source : shown) ? () => void describe((editing ? source : shown)!) : null
+              }
               helping={helping}
             />
           </div>
@@ -826,7 +967,11 @@ export function Studio() {
       </main>
       {large !== null && lightboxItems.length > 0 && (
         <Lightbox
-          items={lightboxItems.map((p) => ({ src: fileUrl(p.path), name: p.prompt || 'Picture', onSave: () => void saveAs(p) }))}
+          items={lightboxItems.map((p) => ({
+            src: fileUrl(p.path),
+            name: p.prompt || 'Picture',
+            onSave: () => void saveAs(p),
+          }))}
           start={Math.min(large, lightboxItems.length - 1)}
           onClose={() => setLarge(null)}
         />
@@ -842,10 +987,7 @@ export function Studio() {
         />
       )}
       {toast && (
-        <Toast
-          action={toast.undo ? { label: 'Undo', onPress: toast.undo } : undefined}
-          onClose={() => setToast(null)}
-        >
+        <Toast action={toast.undo ? { label: 'Undo', onPress: toast.undo } : undefined} onClose={() => setToast(null)}>
           {toast.text}
         </Toast>
       )}

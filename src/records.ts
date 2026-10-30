@@ -135,7 +135,10 @@ export async function addRun(run: Run): Promise<void> {
   });
 }
 
-export async function updateRun(id: string, fields: Partial<Pick<Run, 'job' | 'status' | 'error' | 'started' | 'finished'>>): Promise<void> {
+export async function updateRun(
+  id: string,
+  fields: Partial<Pick<Run, 'status' | 'error' | 'started' | 'finished'>>,
+): Promise<void> {
   const names = Object.keys(fields) as (keyof typeof fields)[];
   if (names.length === 0) return;
   await call('hearthscale/db/exec', {
@@ -220,7 +223,10 @@ export async function latestCompare(): Promise<string | null> {
 }
 
 export async function setFavourite(id: string, favourite: boolean): Promise<void> {
-  await call('hearthscale/db/exec', { sql: 'UPDATE pictures SET favourite = ? WHERE id = ?', params: [favourite ? 1 : 0, id] });
+  await call('hearthscale/db/exec', {
+    sql: 'UPDATE pictures SET favourite = ? WHERE id = ?',
+    params: [favourite ? 1 : 0, id],
+  });
 }
 
 export async function forgetPictures(ids: string[]): Promise<void> {

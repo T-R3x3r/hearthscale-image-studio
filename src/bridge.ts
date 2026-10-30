@@ -1,4 +1,9 @@
-import { App, McpUiMessageResultSchema, PostMessageTransport, type McpUiHostContext } from '@modelcontextprotocol/ext-apps';
+import {
+  App,
+  McpUiMessageResultSchema,
+  PostMessageTransport,
+  type McpUiHostContext,
+} from '@modelcontextprotocol/ext-apps';
 import { extensionCall } from '@hearthscale/app/view';
 import type { ViewExtensionNotification, ViewHostContext, ViewHostMethods } from '@hearthscale/app';
 

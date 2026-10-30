@@ -81,6 +81,7 @@ export function PromptBar(props: {
   count: number;
   onCount: (count: number) => void;
   showCount: boolean;
+  comparing: boolean;
   advanced: Advanced;
   onAdvanced: (advanced: Advanced) => void;
   mode: Mode;
@@ -95,7 +96,8 @@ export function PromptBar(props: {
   const file = useRef<HTMLInputElement>(null);
   const [advancedAt, setAdvancedAt] = useState<HTMLElement | null>(null);
   const tips = useFloatingTips('top');
-  const set = (field: keyof Advanced) => (e: { target: { value: string } }) => props.onAdvanced({ ...props.advanced, [field]: e.target.value });
+  const set = (field: keyof Advanced) => (e: { target: { value: string } }) =>
+    props.onAdvanced({ ...props.advanced, [field]: e.target.value });
   const add = tips('add', props.source ? 'Add a picture to the prompt' : 'Open a picture');
   const improve = tips('improve', 'Improve my words');
   const describe = tips('describe', 'Describe this picture');
@@ -136,9 +138,12 @@ export function PromptBar(props: {
         }}
       />
       <div className="is-prompt-row">
-        {(!props.source || props.canAddReference) && (
+        {!props.comparing && (!props.source || props.canAddReference) && (
           <span {...add.hover} className="is-tipwrap">
-            <IconButton aria-label={props.source ? 'Add a picture to the prompt' : 'Open a picture'} onClick={() => file.current?.click()}>
+            <IconButton
+              aria-label={props.source ? 'Add a picture to the prompt' : 'Open a picture'}
+              onClick={() => file.current?.click()}
+            >
               <Icon name="image-add-line" size={16} />
             </IconButton>
             {add.tip}
@@ -155,23 +160,33 @@ export function PromptBar(props: {
             if (picked) props.onOpenFile(picked);
           }}
         />
-        <Menu label="Image model" value={props.model?.label ?? 'No image model'} icon={<Icon name="image-ai-line" size={14} />}>
-          {(close) => (
-            <>
-              {props.models.map((card) => (
+        {!props.comparing && (
+          <Menu
+            label="Image model"
+            value={props.model?.label ?? 'No image model'}
+            icon={<Icon name="image-ai-line" size={14} />}
+          >
+            {(close) => (
+              <>
+                {props.models.map((card) => (
+                  <MItem
+                    key={card.id}
+                    label={card.label}
+                    chip={gigabytes(card.sizeBytes)}
+                    checked={card.id === props.model?.id}
+                    onClick={() => (close(), props.onModel(card.id))}
+                  />
+                ))}
+                {props.models.length > 0 && <MDivider />}
                 <MItem
-                  key={card.id}
-                  label={card.label}
-                  chip={gigabytes(card.sizeBytes)}
-                  checked={card.id === props.model?.id}
-                  onClick={() => (close(), props.onModel(card.id))}
+                  icon={<Icon name="download-cloud-2-line" size={14} />}
+                  label="Get more models"
+                  onClick={() => (close(), props.onGetModels())}
                 />
-              ))}
-              {props.models.length > 0 && <MDivider />}
-              <MItem icon={<Icon name="download-cloud-2-line" size={14} />} label="Get more models" onClick={() => (close(), props.onGetModels())} />
-            </>
-          )}
-        </Menu>
+              </>
+            )}
+          </Menu>
+        )}
         {!props.source && (
           <>
             <Menu
@@ -183,25 +198,44 @@ export function PromptBar(props: {
                 <>
                   <MSection>Shape</MSection>
                   {SHAPES.map((shape) => (
-                    <MItem key={shape.id} label={shape.label} checked={shape.id === props.shape} onClick={() => (close(), props.onShape(shape.id))} />
+                    <MItem
+                      key={shape.id}
+                      label={shape.label}
+                      checked={shape.id === props.shape}
+                      onClick={() => (close(), props.onShape(shape.id))}
+                    />
                   ))}
                   <MDivider />
                   <MSection>Size</MSection>
                   {SIZES.map((size) => (
-                    <MItem key={size.id} label={size.label} checked={size.id === props.size} onClick={() => (close(), props.onSize(size.id))} />
+                    <MItem
+                      key={size.id}
+                      label={size.label}
+                      checked={size.id === props.size}
+                      onClick={() => (close(), props.onSize(size.id))}
+                    />
                   ))}
                 </>
               )}
             </Menu>
           </>
         )}
-        <Menu label="Style" value={STYLES.find((s) => s.id === props.style)?.label ?? 'No style'} icon={<Icon name="palette-line" size={14} />}>
+        <Menu
+          label="Style"
+          value={STYLES.find((s) => s.id === props.style)?.label ?? 'No style'}
+          icon={<Icon name="palette-line" size={14} />}
+        >
           {(close) => (
             <>
               <MItem label="No style" checked={props.style === null} onClick={() => (close(), props.onStyle(null))} />
               <MDivider />
               {STYLES.map((style) => (
-                <MItem key={style.id} label={style.label} checked={style.id === props.style} onClick={() => (close(), props.onStyle(style.id))} />
+                <MItem
+                  key={style.id}
+                  label={style.label}
+                  checked={style.id === props.style}
+                  onClick={() => (close(), props.onStyle(style.id))}
+                />
               ))}
             </>
           )}
@@ -212,7 +246,12 @@ export function PromptBar(props: {
               [1, 2, 4]
                 .filter((n) => n <= props.abilities.count)
                 .map((n) => (
-                  <MItem key={n} label={n === 1 ? '1 picture' : `${n} pictures`} checked={n === props.count} onClick={() => (close(), props.onCount(n))} />
+                  <MItem
+                    key={n}
+                    label={n === 1 ? '1 picture' : `${n} pictures`}
+                    checked={n === props.count}
+                    onClick={() => (close(), props.onCount(n))}
+                  />
                 ))
             }
           </Menu>
@@ -237,7 +276,15 @@ export function PromptBar(props: {
         {props.amount !== null && <span className="is-bar-label">How much</span>}
         {props.amount !== null && (
           <div className="is-amount">
-            <Slider label="How much to change" value={props.amount} onChange={props.onAmount} min={0.05} max={1} step={0.05} shown={`${Math.round(props.amount * 100)}%`} />
+            <Slider
+              label="How much to change"
+              value={props.amount}
+              onChange={props.onAmount}
+              min={0.05}
+              max={1}
+              step={0.05}
+              shown={`${Math.round(props.amount * 100)}%`}
+            />
           </div>
         )}
         <span className="is-grow" />
@@ -251,8 +298,16 @@ export function PromptBar(props: {
         )}
         {props.onImprove && (
           <span {...improve.hover} className="is-tipwrap">
-            <IconButton aria-label="Improve my words" disabled={props.helping || !props.words.trim()} onClick={props.onImprove}>
-              <Icon name={props.helping ? 'loader-4-line' : 'magic-line'} size={16} className={props.helping ? 'hs-spin' : undefined} />
+            <IconButton
+              aria-label="Improve my words"
+              disabled={props.helping || !props.words.trim()}
+              onClick={props.onImprove}
+            >
+              <Icon
+                name={props.helping ? 'loader-4-line' : 'magic-line'}
+                size={16}
+                className={props.helping ? 'hs-spin' : undefined}
+              />
             </IconButton>
             {improve.tip}
           </span>
@@ -268,13 +323,31 @@ export function PromptBar(props: {
               <TextField label="Leave out" value={props.advanced.negative} onChange={set('negative')} data-autofocus />
             )}
             {props.abilities.steps && (
-              <TextField label="Steps" inputMode="numeric" placeholder="Model's own" value={props.advanced.steps} onChange={set('steps')} />
+              <TextField
+                label="Steps"
+                inputMode="numeric"
+                placeholder="Model's own"
+                value={props.advanced.steps}
+                onChange={set('steps')}
+              />
             )}
             {props.abilities.guidance && (
-              <TextField label="Follow the words" inputMode="decimal" placeholder="Model's own" value={props.advanced.guidance} onChange={set('guidance')} />
+              <TextField
+                label="Follow the words"
+                inputMode="decimal"
+                placeholder="Model's own"
+                value={props.advanced.guidance}
+                onChange={set('guidance')}
+              />
             )}
             {props.abilities.seed && (
-              <TextField label="Variation number" inputMode="numeric" placeholder="New each time" value={props.advanced.seed} onChange={set('seed')} />
+              <TextField
+                label="Variation number"
+                inputMode="numeric"
+                placeholder="New each time"
+                value={props.advanced.seed}
+                onChange={set('seed')}
+              />
             )}
           </div>
         </Popover>

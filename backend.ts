@@ -11,7 +11,12 @@ const backend: Backend = {
   },
   tools: {
     async make(input) {
-      const { run, kind, model, input: request } = input as {
+      const {
+        run,
+        kind,
+        model,
+        input: request,
+      } = input as {
         run: string;
         kind: 'image' | 'upscale';
         model: string;
@@ -23,13 +28,19 @@ const backend: Backend = {
         input: request,
         save: { root: 'data', path: folderOf(run) },
       });
+      await ctx.db!.exec('UPDATE runs SET job = ? WHERE id = ?', [job.id, run]);
       return { job };
     },
 
     async hold(input) {
       const { paths } = input as { paths: string[] };
       const assets: string[] = [];
-      for (const path of paths) assets.push(await ctx.assets.import({ root: 'data', path }, 'image/png'));
+      try {
+        for (const path of paths) assets.push(await ctx.assets.import({ root: 'data', path }, 'image/png'));
+      } catch (error) {
+        for (const asset of assets) await ctx.assets.release(asset);
+        throw error;
+      }
       return { assets };
     },
 
@@ -42,9 +53,12 @@ const backend: Backend = {
     async keep(input) {
       const { asset, run } = input as { asset: string; run: string };
       const path = `${folderOf(run)}/image.png`;
-      await ctx.fs!.mkdir({ root: 'data', path: folderOf(run) });
-      await ctx.fs!.export(asset, { root: 'data', path });
-      await ctx.assets.release(asset);
+      try {
+        await ctx.fs!.mkdir({ root: 'data', path: folderOf(run) });
+        await ctx.fs!.export(asset, { root: 'data', path });
+      } finally {
+        await ctx.assets.release(asset);
+      }
       return { path };
     },
 

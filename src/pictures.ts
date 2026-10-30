@@ -38,7 +38,7 @@ function toPng(canvas: HTMLCanvasElement): Promise<Blob> {
   );
 }
 
-async function upload(name: string, blob: Blob): Promise<string> {
+export async function upload(name: string, blob: Blob): Promise<string> {
   const { asset } = await host('hearthscale/ui/upload-file', { name, mediaType: 'image/png', blob });
   return asset;
 }
@@ -48,7 +48,7 @@ const OPENED_AREA = 1024 * 1024;
 
 /** A picture the person opened, made a PNG a job takes: scaled down to the
  *  area a model draws well and cut to multiples of 64 on each side. */
-export async function preparedUpload(file: Blob): Promise<string> {
+export async function prepared(file: Blob): Promise<Blob> {
   const url = URL.createObjectURL(file);
   try {
     const image = await loadImage(url);
@@ -60,8 +60,10 @@ export async function preparedUpload(file: Blob): Promise<string> {
     const canvas = document.createElement('canvas');
     canvas.width = width;
     canvas.height = height;
-    canvas.getContext('2d')!.drawImage(image, (width - scaledWidth) / 2, (height - scaledHeight) / 2, scaledWidth, scaledHeight);
-    return await upload('picture.png', await toPng(canvas));
+    canvas
+      .getContext('2d')!
+      .drawImage(image, (width - scaledWidth) / 2, (height - scaledHeight) / 2, scaledWidth, scaledHeight);
+    return await toPng(canvas);
   } finally {
     URL.revokeObjectURL(url);
   }
@@ -69,7 +71,7 @@ export async function preparedUpload(file: Blob): Promise<string> {
 
 /** A mask a job takes from the strokes of the brush: white where the
  *  strokes cover the picture, black elsewhere. */
-export async function maskUpload(strokes: HTMLCanvasElement): Promise<string> {
+export async function maskOf(strokes: HTMLCanvasElement): Promise<Blob> {
   const canvas = document.createElement('canvas');
   canvas.width = strokes.width;
   canvas.height = strokes.height;
@@ -84,7 +86,7 @@ export async function maskUpload(strokes: HTMLCanvasElement): Promise<string> {
     pixels.data[i + 3] = 255;
   }
   context.putImageData(pixels, 0, 0);
-  return upload('mask.png', await toPng(canvas));
+  return toPng(canvas);
 }
 
 /** How many pixels each side of a picture grows by. */
@@ -117,11 +119,15 @@ const SEAM = 16;
 
 /** The picture of an extend and its mask: the picture in place on a larger
  *  canvas, the new border filled with a blur of the picture so the model
- *  starts from its colours, and a mask that is white over the border. */
-export async function extendUploads(path: string, margins: Margins): Promise<{ image: string; mask: string; width: number; height: number }> {
-  const picture = await loadImage(fileUrl(path));
-  const width = picture.naturalWidth + margins.left + margins.right;
-  const height = picture.naturalHeight + margins.top + margins.bottom;
+ *  starts from its colours, and a mask that is white over the border. The
+ *  picture is drawn from its bytes, so the canvas can be read back. */
+export async function extended(
+  path: string,
+  margins: Margins,
+): Promise<{ image: Blob; mask: Blob; width: number; height: number }> {
+  const picture = await createImageBitmap(await blobOf(path));
+  const width = picture.width + margins.left + margins.right;
+  const height = picture.height + margins.top + margins.bottom;
 
   const canvas = document.createElement('canvas');
   canvas.width = width;
@@ -143,12 +149,11 @@ export async function extendUploads(path: string, margins: Margins): Promise<{ i
   ink.fillRect(
     margins.left + inset(margins.left),
     margins.top + inset(margins.top),
-    picture.naturalWidth - inset(margins.left) - inset(margins.right),
-    picture.naturalHeight - inset(margins.top) - inset(margins.bottom),
+    picture.width - inset(margins.left) - inset(margins.right),
+    picture.height - inset(margins.top) - inset(margins.bottom),
   );
 
-  const [image, maskAsset] = await Promise.all([upload('extended.png', await toPng(canvas)), upload('mask.png', await toPng(mask))]);
-  return { image, mask: maskAsset, width, height };
+  return { image: await toPng(canvas), mask: await toPng(mask), width, height };
 }
 
 /** A file name for a saved picture, from its words and its number. */

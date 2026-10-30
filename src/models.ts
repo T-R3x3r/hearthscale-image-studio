@@ -15,6 +15,8 @@ export interface Abilities {
   fill: boolean;
   /** Reads reference pictures, which a model made for editing follows. */
   edit: boolean;
+  /** Takes a width and a height. */
+  size: boolean;
   negative: boolean;
   seed: boolean;
   steps: boolean;
@@ -31,6 +33,7 @@ export function abilitiesOf(card: ModelCard | undefined): Abilities {
     change: 'image' in props,
     fill: 'mask' in props,
     edit: 'references' in props,
+    size: 'width' in props && 'height' in props,
     negative: 'negativePrompt' in props,
     seed: 'seed' in props,
     steps: 'steps' in props,
@@ -48,6 +51,8 @@ export interface Models {
   chat: ModelCard | null;
   /** The image model the platform picks for the app. */
   chosen: string | null;
+  /** The upscale model the platform picks for the app. */
+  upscaleChosen: string | null;
   absentImage: ModelCard[];
   absentUpscale: ModelCard[];
   downloading: ModelCard[];
@@ -69,6 +74,7 @@ export async function readModels(): Promise<Models> {
     upscale: upscale.cards,
     chat: chat.cards.find((card) => card.id === chatCard) ?? null,
     chosen: image.chosen.image?.card ?? null,
+    upscaleChosen: upscale.chosen.upscale?.card ?? null,
     absentImage: absentImage.cards,
     absentUpscale: absentUpscale.cards,
     downloading: [...downloadingImage.cards, ...downloadingUpscale.cards],
@@ -76,7 +82,14 @@ export async function readModels(): Promise<Models> {
 }
 
 /** Calls `fn` with each move of a download of any Server's models. */
-export function onDownload(fn: (download: { card: string; state: string; progress?: { receivedBytes: number; totalBytes: number }; reason?: string }) => void) {
+export function onDownload(
+  fn: (download: {
+    card: string;
+    state: string;
+    progress?: { receivedBytes: number; totalBytes: number };
+    reason?: string;
+  }) => void,
+) {
   return on('hearthscale/models/download', ({ download }) => fn(download));
 }
 
