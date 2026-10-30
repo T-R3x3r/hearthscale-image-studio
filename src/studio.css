@@ -15,10 +15,10 @@ body {
   /* The top bar: a control's height with the sidebar's inset above and
      below, so its controls and the library's first row share one line. */
   --studio-head: calc(var(--h-ctl) + var(--pad-sidebar) * 2);
-  /* The column a page's content and the prompt share, and the inset beside
-     it: a page scroller's own inset and the scrollbar room it keeps. */
-  --studio-column: calc(var(--content-width) + var(--space) * 25.5);
-  --studio-side: calc(var(--space) * 7.25 + var(--scroll-size));
+  /* The column every view's content and the prompt share, and the one
+     inset around the stage, the prompt and a page. */
+  --studio-column: var(--content-width);
+  --studio-inset: calc(var(--space) * 7.25);
   position: relative;
   display: flex;
   height: 100%;
@@ -210,7 +210,7 @@ body {
   flex: 1;
   flex-direction: column;
   min-height: 0;
-  padding: var(--studio-side);
+  padding: var(--studio-inset);
 }
 
 .is-stage-area {
@@ -365,14 +365,21 @@ body {
   flex-direction: column;
   gap: var(--gap-stack);
   width: 100%;
-  max-width: calc(var(--studio-column) + var(--studio-side) * 2);
+  max-width: calc(var(--studio-column) + var(--studio-inset) * 2);
   margin: 0 auto;
-  padding: 0 var(--studio-side) calc(var(--space) * 6);
+  padding: 0 var(--studio-inset) var(--studio-inset);
   box-sizing: border-box;
 }
 
+/* A page keeps the scrollbar's room on both sides; its padding makes up
+   the rest of the inset, so its edges meet the prompt's. */
+.is-page {
+  padding-right: calc(var(--studio-inset) - var(--scroll-size));
+  padding-left: calc(var(--studio-inset) - var(--scroll-size));
+}
+
 .is-page + .is-dock {
-  padding-top: calc(var(--space) * 4);
+  padding-top: var(--studio-inset);
 }
 
 .is-shelf-picture {
@@ -535,16 +542,7 @@ body {
   }
 
   .is-studio {
-    --studio-side: calc(var(--gap-row) + var(--scroll-size));
-  }
-
-  .is-page {
-    padding-right: var(--gap-row);
-    padding-left: var(--gap-row);
-  }
-
-  .is-dock {
-    padding-bottom: var(--gap-row);
+    --studio-inset: var(--gap-row);
   }
 
   .is-bar-slider,
