@@ -738,7 +738,6 @@ export function Studio() {
     setPrefs({
       style: run.style,
       ...(fit ?? {}),
-      ...(imageCards.some((c) => c.id === run.model) ? { model: run.model } : {}),
     });
   }
 
