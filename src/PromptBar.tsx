@@ -15,7 +15,7 @@ import {
   type MenuAnchor,
 } from '@hearthscale/app-ui';
 import { call, fileUrl } from './bridge';
-import type { Picture } from './records';
+import { pictureName, type Picture } from './records';
 import type { Abilities } from './models';
 import { SHAPES, SIZES, STYLES, type ShapeId, type SizeId } from './recipes';
 
@@ -170,7 +170,7 @@ export function PromptBar(props: {
             <div className="hs-shelf-tiles">
               {chips.map((picture, index) => (
                 <div key={picture.id} className="hs-shelf-tile">
-                  <img className="is-shelf-picture" src={fileUrl(picture.path)} alt={picture.prompt} />
+                  <img className="is-shelf-picture" src={fileUrl(picture.path)} alt={pictureName(picture)} />
                   {chips.length > 1 && <span className="is-prompt-number">{index + 1}</span>}
                   <button
                     className="hs-shelf-remove"

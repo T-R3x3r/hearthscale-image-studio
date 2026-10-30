@@ -33,6 +33,12 @@ export function nameOf(words: string): string {
   return words.charAt(0).toUpperCase() + words.slice(1);
 }
 
+/** The name a picture shows under: its prompt, or "Opened picture" for one
+ *  the person opened from a file. */
+export function pictureName(picture: Picture): string {
+  return picture.prompt ? nameOf(picture.prompt) : 'Opened picture';
+}
+
 export type Action = 'make' | 'change' | 'edit' | 'fill' | 'erase' | 'extend' | 'enlarge' | 'open';
 
 /** One picture of a run, as a file of the app's data folder. */

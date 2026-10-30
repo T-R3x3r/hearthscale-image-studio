@@ -19,7 +19,7 @@ import {
   type MenuAnchor,
 } from '@hearthscale/app-ui';
 import { app, assetUrl, fileUrl } from './bridge';
-import type { Picture } from './records';
+import { pictureName, type Picture } from './records';
 import type { Live } from './runs';
 import { IDEAS } from './recipes';
 import { paintStrokes, type Margins, type Stroke } from './pictures';
@@ -288,7 +288,7 @@ export function Stage(props: StageProps) {
         <img
           className="is-picture"
           src={fileUrl(picture.path)}
-          alt={picture.prompt}
+          alt={pictureName(picture)}
           style={
             margins
               ? {

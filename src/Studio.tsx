@@ -11,6 +11,7 @@ import {
   latestCompare,
   listPictures,
   nameOf,
+  pictureName,
   openLibrary,
   picturesOfRun,
   runsOfCompare,
@@ -877,9 +878,7 @@ export function Studio() {
     page === 'compare'
       ? 'Compare models'
       : stagePicture
-        ? stagePicture.prompt
-          ? nameOf(stagePicture.prompt)
-          : 'Opened picture'
+        ? pictureName(stagePicture)
         : stripRun && stripLive
           ? nameOf(stripRun.prompt)
           : 'New picture';
@@ -953,7 +952,7 @@ export function Studio() {
                     data-on={picture.id === shown?.id}
                     onClick={() => void show(picture)}
                   >
-                    <img src={fileUrl(picture.path)} alt={picture.prompt} />
+                    <img src={fileUrl(picture.path)} alt={pictureName(picture)} />
                   </button>
                 ))}
                 {stripLive &&
@@ -1048,7 +1047,7 @@ export function Studio() {
         <Lightbox
           items={lightboxItems.map((p) => ({
             src: fileUrl(p.path),
-            name: p.prompt ? nameOf(p.prompt) : 'Picture',
+            name: pictureName(p),
             onSave: () => void saveAs(p),
           }))}
           start={Math.min(large, lightboxItems.length - 1)}

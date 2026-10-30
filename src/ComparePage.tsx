@@ -11,7 +11,7 @@ import {
   useFloatingTips,
 } from '@hearthscale/app-ui';
 import { assetUrl, fileUrl, publisherPicture } from './bridge';
-import { nameOf, type Picture, type Run } from './records';
+import { nameOf, pictureName, type Picture, type Run } from './records';
 import { ProblemNotice } from './Problem';
 import type { Live } from './runs';
 
@@ -91,7 +91,7 @@ export function ComparePage(props: {
                       <div className="is-compare-cell">
                         {picture ? (
                           <button className="is-compare-picture" onClick={() => props.onShow(picture)}>
-                            <img src={fileUrl(picture.path)} alt={run.prompt} />
+                            <img src={fileUrl(picture.path)} alt={pictureName(picture)} />
                           </button>
                         ) : live ? (
                           <div className="is-compare-making">

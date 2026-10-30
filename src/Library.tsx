@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { Button, Icon, TextInput, VirtualList } from '@hearthscale/app-ui';
 import { fileUrl } from './bridge';
-import type { Picture } from './records';
+import { pictureName, type Picture } from './records';
 
 const PER_ROW = 3;
 
@@ -126,10 +126,10 @@ export function Library(props: {
                     key={picture.id}
                     className="is-thumb"
                     data-on={picture.id === props.shown}
-                    aria-label={picture.prompt || 'Picture'}
+                    aria-label={pictureName(picture)}
                     onClick={() => props.onShow(picture)}
                   >
-                    <img src={fileUrl(picture.path)} alt={picture.prompt} loading="lazy" decoding="async" />
+                    <img src={fileUrl(picture.path)} alt="" loading="lazy" decoding="async" />
                     {picture.favourite && <Icon name="heart-fill" size={12} className="is-thumb-mark" />}
                   </button>
                 ))}
