@@ -70,7 +70,6 @@ const LABELS: Record<Action | 'compare', string> = {
   compare: 'Compare',
 };
 
-/** What the prompt holds for each action, as an example of real words. */
 /** What did not happen when an action failed, in one sentence. */
 const UNDONE: Record<Action | 'compare', string> = {
   make: 'The picture was not made.',
@@ -84,6 +83,7 @@ const UNDONE: Record<Action | 'compare', string> = {
   compare: 'The comparison did not start.',
 };
 
+/** What the prompt holds for each action, as an example of real words. */
 const EXAMPLES: Record<Exclude<Action, 'enlarge' | 'open'> | 'compare', string> = {
   make: 'A red fox in a snowy forest at dawn',
   compare: 'A red fox in a snowy forest at dawn',
