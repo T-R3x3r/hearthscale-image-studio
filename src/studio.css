@@ -251,10 +251,8 @@ body {
 }
 
 .is-compare-one {
-  width: 100%;
-  max-width: calc(var(--space) * 200);
-  max-height: 100%;
-  overflow: auto;
+  overflow: hidden;
+  border-radius: var(--r-card);
 }
 
 .is-stage-bar {

@@ -172,7 +172,7 @@ export function Stage(props: {
   let body;
   if (props.comparing && picture && props.sourceOf) {
     body = (
-      <div className="is-compare-one">
+      <div className="is-compare-one" style={{ width: box.width }}>
         <PictureCompare
           before={{ src: fileUrl(props.sourceOf.path), name: 'Before' }}
           after={{ src: fileUrl(picture.path), name: 'After' }}

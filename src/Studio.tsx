@@ -206,6 +206,7 @@ export function Studio() {
   const [starting, setStarting] = useState(false);
   const [opened, setOpened] = useState(false);
   const shownBlob = useRef<{ path: string; blob: Blob } | null>(null);
+  const shownBefore = useRef<Picture | null>(null);
   const stripRunRef = useRef<Run | null>(null);
   const compareSetRef = useRef<string | null>(null);
   const live = useLive();
@@ -273,6 +274,7 @@ export function Studio() {
           setStripRun(await getRun(id));
           setStrip(made);
           if (outcome === 'done' && made[0]) await show(made[0]);
+          if (outcome !== 'done' && shownBefore.current) await show(shownBefore.current);
           if (outcome === 'failed' && error) setProblem(error);
         }
         if (compareSetRef.current) await loadCompare(compareSetRef.current);
@@ -385,6 +387,7 @@ export function Studio() {
     setProblem(null);
     setStripRun(run);
     setStrip([]);
+    shownBefore.current = shown;
     setShown(null);
     setComparing(false);
     await startRun(run, input, LABELS[run.action]);
@@ -477,7 +480,7 @@ export function Studio() {
       action: kind,
       model: model!.id,
       label: model!.label,
-      prompt: prompt || from.prompt,
+      prompt: kind === 'fill' || kind === 'erase' || kind === 'extend' ? from.prompt : prompt || from.prompt,
       style: kind === 'erase' || kind === 'extend' ? null : prefs.style,
       width,
       height,
