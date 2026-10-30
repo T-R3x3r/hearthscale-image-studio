@@ -30,6 +30,15 @@ body {
   display: inline-flex;
 }
 
+.is-problem-text {
+  align-items: center;
+  gap: var(--gap-inline);
+}
+
+.is-problem-mark {
+  color: var(--dim);
+}
+
 /* Where the footer wraps, its end keeps to the right of its row. */
 .is-prompt-end {
   display: flex;

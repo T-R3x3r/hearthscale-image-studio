@@ -12,6 +12,7 @@ import {
 } from '@hearthscale/app-ui';
 import { assetUrl, fileUrl, publisherPicture } from './bridge';
 import { nameOf, type Picture, type Run } from './records';
+import { ProblemNotice } from './Problem';
 import type { Live } from './runs';
 
 /** The most models one compare runs. */
@@ -50,12 +51,9 @@ export function ComparePage(props: {
       <div className="hs-scroll hs-settings-scroll is-page">
         <main className="is-compare-page">
           {props.models.length === 0 && props.unavailable ? (
-            <Notice>
-              {props.unavailable}
-              <button className="hs-link" onClick={props.onRetry}>
-                Try again
-              </button>
-            </Notice>
+            <ProblemNotice
+              problem={{ text: 'No image model can run now.', detail: props.unavailable, retry: props.onRetry }}
+            />
           ) : props.models.length < 2 ? (
             <Notice>Compare needs at least two image models.</Notice>
           ) : (

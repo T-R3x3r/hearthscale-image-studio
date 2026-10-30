@@ -9,7 +9,6 @@ import {
   MItem,
   MenuSurface,
   Meter,
-  Notice,
   PictureCompare,
   Popover,
   SegmentedControl,
@@ -24,6 +23,7 @@ import type { Picture } from './records';
 import type { Live } from './runs';
 import { IDEAS } from './recipes';
 import { paintStrokes, type Margins, type Stroke } from './pictures';
+import { ProblemNotice } from './Problem';
 
 export type Tool = 'none' | 'brush' | 'extend';
 
@@ -344,12 +344,9 @@ export function Stage(props: StageProps) {
         </Button>
       </EmptyState>
     ) : (
-      <Notice>
-        {props.unavailable}
-        <button className="hs-link" onClick={props.onRetry}>
-          Try again
-        </button>
-      </Notice>
+      <ProblemNotice
+        problem={{ text: 'No image model can run now.', detail: props.unavailable, retry: props.onRetry }}
+      />
     );
   } else {
     body = (

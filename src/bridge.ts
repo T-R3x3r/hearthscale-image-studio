@@ -26,7 +26,7 @@ export async function tool<T>(name: string, args: Record<string, unknown>, label
       ?.map((part) => (part.type === 'text' ? part.text : ''))
       .join(' ')
       .trim();
-    throw new Error(words || 'The action did not finish. Try again.');
+    throw new Error(words || 'The action did not finish.');
   }
   return result.structuredContent as T;
 }

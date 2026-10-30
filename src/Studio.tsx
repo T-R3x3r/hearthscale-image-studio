@@ -1,16 +1,6 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import type { ChatMessage, ModelCard } from '@hearthscale/app';
-import {
-  Button,
-  Icon,
-  IconButton,
-  Lightbox,
-  Meter,
-  Notice,
-  ShellConfirm,
-  Toast,
-  useFloatingTips,
-} from '@hearthscale/app-ui';
+import { Button, Icon, IconButton, Lightbox, Meter, ShellConfirm, Toast, useFloatingTips } from '@hearthscale/app-ui';
 import { call, download, fileUrl, hostContext, on, reason, tool } from './bridge';
 import {
   addRun,
@@ -47,6 +37,7 @@ import { Library } from './Library';
 import { Stage, StageBar, type Mode, type PictureActions, type Sides, type StageProps, type Tool } from './Stage';
 import { PromptBar, type Advanced } from './PromptBar';
 import { ComparePage, type Column } from './ComparePage';
+import { ProblemNotice, type Problem } from './Problem';
 
 type Page = 'studio' | 'compare';
 
@@ -73,6 +64,19 @@ const LABELS: Record<Action | 'compare', string> = {
 };
 
 /** What the prompt holds for each action, as an example of real words. */
+/** What did not happen when an action failed, in one sentence. */
+const UNDONE: Record<Action | 'compare', string> = {
+  make: 'The picture was not made.',
+  change: 'The picture was not changed.',
+  edit: 'The picture was not changed.',
+  fill: 'The picture was not changed.',
+  erase: 'The picture was not changed.',
+  extend: 'The picture was not changed.',
+  enlarge: 'The picture was not enlarged.',
+  open: 'The picture did not open.',
+  compare: 'The comparison did not start.',
+};
+
 const EXAMPLES: Record<Exclude<Action, 'enlarge' | 'open'> | 'compare', string> = {
   make: 'A red fox in a snowy forest at dawn',
   compare: 'A red fox in a snowy forest at dawn',
@@ -154,7 +158,7 @@ async function complete(content: ChatMessage['content'], system: string | null):
     if (id !== stream) return;
     if ('text' in delta) {
       if (!delta.reasoning) text += delta.text;
-    } else if (delta.stop === 'error') failure = delta.error ?? 'The chat model stopped. Try again.';
+    } else if (delta.stop === 'error') failure = delta.error ?? 'The chat model stopped.';
   });
   try {
     await call('hearthscale/models/complete', {
@@ -227,7 +231,7 @@ export function Studio() {
   const [sides, setSides] = useState<Sides>({ left: false, right: true, top: false, bottom: false, share: 0.25 });
   const [compareSet, setCompareSet] = useState<string | null>(null);
   const [compareRuns, setCompareRuns] = useState<{ run: Run; picture: Picture | null }[]>([]);
-  const [problem, setProblem] = useState<string | null>(null);
+  const [problem, setProblem] = useState<Problem | null>(null);
   const [toast, setToast] = useState<{ text: string; undo?: () => void } | null>(null);
   const [large, setLarge] = useState<number | null>(null);
   const [deleting, setDeleting] = useState<Picture | null>(null);
@@ -238,6 +242,8 @@ export function Studio() {
   const shownBlob = useRef<{ path: string; blob: Blob } | null>(null);
   const shownBefore = useRef<Picture | null>(null);
   const stripRunRef = useRef<Run | null>(null);
+  /** What starts each run again, by the run's id. */
+  const agains = useRef(new Map<string, () => Promise<unknown>>());
   const compareSetRef = useRef<string | null>(null);
   const live = useLive();
   const locale = hostContext().locale ?? navigator.language;
@@ -288,7 +294,7 @@ export function Studio() {
       const set = await latestCompare();
       setCompareSet(set);
       await loadCompare(set);
-    })().catch((error) => setProblem(reason(error)));
+    })().catch(failed('The library did not open.', null));
   }, [refreshModels, loadCompare]);
 
   useEffect(() => {
@@ -303,13 +309,16 @@ export function Studio() {
     () =>
       onEnded(async (id, outcome, error) => {
         await refreshLibrary();
-        if (id === stripRunRef.current?.id) {
+        const run = stripRunRef.current;
+        if (id === run?.id) {
           const made = await picturesOfRun(id);
           setStripRun(await getRun(id));
           setStrip(made);
           if (outcome === 'done' && made[0]) await show(made[0]);
           if (outcome !== 'done' && shownBefore.current) await show(shownBefore.current);
-          if (outcome === 'failed' && error) setProblem(error);
+          if (outcome === 'failed' && error) {
+            failed(UNDONE[run.action], agains.current.get(id) ?? null)(error);
+          }
         }
         if (compareSetRef.current) await loadCompare(compareSetRef.current);
       }),
@@ -320,7 +329,11 @@ export function Studio() {
     () =>
       onDownload((moved) => {
         if (moved.state !== 'downloading') {
-          if (moved.state !== 'ready' && moved.reason) setProblem(moved.reason);
+          if (moved.state !== 'ready' && moved.reason) {
+            failed('The model did not download.', () => call('hearthscale/models/install', { target: moved.card }))(
+              moved.reason,
+            );
+          }
           void refreshModels();
         } else if (!models?.downloading.some((card) => card.id === moved.card)) {
           void refreshModels();
@@ -408,9 +421,22 @@ export function Studio() {
     }
   })();
 
-  /** Starts a run and puts it on the stage while it makes. */
-  async function begin(run: Run, input: Record<string, unknown>) {
+  /** Shows what did not happen, with Hearthscale's words for it in a
+   *  tooltip and, where `again` is given, a press that does it again. */
+  function failed(text: string, again: (() => Promise<unknown>) | null) {
+    return (error: unknown) =>
+      setProblem({
+        text,
+        detail: reason(error) || null,
+        retry: again && (() => (setProblem(null), void again().catch(failed(text, again)))),
+      });
+  }
+
+  /** Starts a run and puts it on the stage while it makes; `again` starts
+   *  the same run anew if this one fails. */
+  async function begin(run: Run, input: Record<string, unknown>, again: () => Promise<unknown>) {
     setProblem(null);
+    agains.current.set(run.id, again);
     setStripRun(run);
     setStrip([]);
     shownBefore.current = shown;
@@ -431,7 +457,7 @@ export function Studio() {
       if (action === 'make') return await make();
       await change(action);
     } catch (error) {
-      setProblem(reason(error));
+      failed(UNDONE[action], submit)(error);
     } finally {
       setStarting(false);
     }
@@ -456,7 +482,7 @@ export function Studio() {
       seed: settings.seed,
       count: settings.count,
     });
-    await begin(run, { prompt, ...sized(abilities, width, height), ...settings.input });
+    await begin(run, { prompt, ...sized(abilities, width, height), ...settings.input }, make);
   }
 
   async function change(kind: Action, from: Picture = source!, strength = amount, prompt = words.trim()) {
@@ -519,7 +545,9 @@ export function Studio() {
       source: from.id,
       inputs,
     });
-    await begin(run, { ...input, ...sized(abilities, width, height), ...settings.input });
+    await begin(run, { ...input, ...sized(abilities, width, height), ...settings.input }, () =>
+      change(kind, from, strength, prompt),
+    );
     if (kind === 'fill' || kind === 'erase' || kind === 'extend') {
       setTool('none');
       setStrokes([]);
@@ -587,7 +615,7 @@ export function Studio() {
       compare: null,
     });
     const sizes = run.width && run.height ? sized(abilitiesOf(card), run.width, run.height) : {};
-    await begin(next, { prompt: styled.prompt, ...sizes, ...settings.input });
+    await begin(next, { prompt: styled.prompt, ...sizes, ...settings.input }, more);
   }
 
   /** Starts the Server's download of a model the app needs, with Hearthscale's install card. */
@@ -608,7 +636,7 @@ export function Studio() {
       source: picture.id,
       inputs,
     });
-    await begin(run, { image: inputs[0] });
+    await begin(run, { image: inputs[0] }, () => enlarge(picture));
   }
 
   async function openFile(file: Blob) {
@@ -628,7 +656,7 @@ export function Studio() {
       }
       await show(picture);
     } catch (error) {
-      setProblem(reason(error));
+      failed(UNDONE.open, () => openFile(file))(error);
     }
   }
 
@@ -642,7 +670,7 @@ export function Studio() {
         setToast({ text: 'Words improved', undo: () => setWords(before) });
       }
     } catch (error) {
-      setProblem(reason(error));
+      failed('Your words were not improved.', improve)(error);
     } finally {
       setHelping(false);
     }
@@ -662,7 +690,7 @@ export function Studio() {
       );
       if (text) setWords(text);
     } catch (error) {
-      setProblem(reason(error));
+      failed('The picture was not described.', () => describe(picture))(error);
     } finally {
       if (assets.length) await tool('release', { assets });
       setHelping(false);
@@ -707,7 +735,7 @@ export function Studio() {
       await navigator.clipboard.write([new ClipboardItem({ 'image/png': kept })]);
       setToast({ text: 'Copied' });
     } catch (error) {
-      setProblem(reason(error));
+      failed('The picture was not copied.', () => copy(picture))(error);
     }
   }
 
@@ -723,7 +751,7 @@ export function Studio() {
       await show(left[0] ?? null);
       await refreshLibrary();
     } catch (error) {
-      setProblem(reason(error));
+      failed('The picture was not deleted.', () => remove(picture))(error);
     }
   }
 
@@ -748,14 +776,23 @@ export function Studio() {
             ? () => setReferences((before) => [...before, shown])
             : undefined,
         vary: abilities.change
-          ? (how) => void change('change', shown, VARY[how], shown.prompt).catch((e) => setProblem(reason(e)))
+          ? (how) => {
+              const again = () => change('change', shown, VARY[how], shown.prompt);
+              void again().catch(failed(UNDONE.change, again));
+            }
           : undefined,
         enlarge:
           upscaler || (models?.absentUpscale.length ?? 0) > 0
-            ? () => void enlarge(shown).catch((e) => setProblem(reason(e)))
+            ? () => {
+                const again = () => enlarge(shown);
+                void again().catch(failed(UNDONE.enlarge, again));
+              }
             : undefined,
         plainBackground: abilities.edit
-          ? () => void change('edit', shown, 1, PLAIN_BACKGROUND_WORDS).catch((e) => setProblem(reason(e)))
+          ? () => {
+              const again = () => change('edit', shown, 1, PLAIN_BACKGROUND_WORDS);
+              void again().catch(failed(UNDONE.edit, again));
+            }
           : undefined,
         compareSource: shownFrom ? () => setComparing(true) : undefined,
         favourite: () => void toggleFavourite(shown),
@@ -808,7 +845,11 @@ export function Studio() {
     suggestion: suggestedImage
       ? { label: suggestedImage.label, downloading: suggestedImage.state === 'downloading' }
       : null,
-    onInstall: () => void (suggestedImage && install(suggestedImage).catch((e) => setProblem(reason(e)))),
+    onInstall: () => {
+      if (!suggestedImage) return;
+      const again = () => install(suggestedImage);
+      void again().catch(failed('The model did not install.', again));
+    },
     onIdea: setWords,
     tool: currentTool,
     onTool: (next) => {
@@ -937,7 +978,7 @@ export function Studio() {
                       variant="ghost"
                       size="sm"
                       icon={<Icon name="add-line" size={14} />}
-                      onClick={() => void more().catch((e) => setProblem(reason(e)))}
+                      onClick={() => void more().catch(failed(UNDONE.make, more))}
                     >
                       Make more
                     </Button>
@@ -961,14 +1002,7 @@ export function Studio() {
           />
         )}
         <div className="is-dock">
-          {problem && (
-            <Notice>
-              {problem}
-              <button className="hs-link" onClick={() => setProblem(null)}>
-                Close
-              </button>
-            </Notice>
-          )}
+          {problem && <ProblemNotice problem={problem} onClose={() => setProblem(null)} />}
           <PromptBar
             words={words}
             onWords={setWords}
