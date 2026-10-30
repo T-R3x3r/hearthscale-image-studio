@@ -5,6 +5,10 @@ import type { Picture } from './records';
 
 const PER_ROW = 3;
 
+/** The classes of a row of the library's navigation: the kit's hover plate,
+ *  and its selected plate or its resting ink. */
+const navRow = (on: boolean) => `is-nav-row hs-hovbox-ink ${on ? 'hs-boxsel' : 'hs-inkmut'}`;
+
 type Row = { kind: 'day'; label: string } | { kind: 'pictures'; pictures: Picture[] };
 
 function dayLabel(made: number, locale: string): string {
@@ -66,34 +70,24 @@ export function Library(props: {
         </Button>
         <nav className="is-library-nav">
           <button
-            className="is-nav-row hs-hovbox-ink"
-            data-on={props.page === 'studio' && !props.favourites}
+            className={navRow(props.page === 'studio' && !props.favourites)}
             onClick={() => (props.onFavourites(false), props.onPage('studio'))}
           >
             <Icon name="gallery-line" size={16} />
             All pictures
           </button>
           <button
-            className="is-nav-row hs-hovbox-ink"
-            data-on={props.page === 'studio' && props.favourites}
+            className={navRow(props.page === 'studio' && props.favourites)}
             onClick={() => (props.onFavourites(true), props.onPage('studio'))}
           >
             <Icon name="heart-line" size={16} />
             Favourites
           </button>
-          <button
-            className="is-nav-row hs-hovbox-ink"
-            data-on={props.page === 'compare'}
-            onClick={() => props.onPage('compare')}
-          >
+          <button className={navRow(props.page === 'compare')} onClick={() => props.onPage('compare')}>
             <Icon name="layout-column-line" size={16} />
             Compare models
           </button>
-          <button
-            className="is-nav-row hs-hovbox-ink"
-            data-on={props.page === 'models'}
-            onClick={() => props.onPage('models')}
-          >
+          <button className={navRow(props.page === 'models')} onClick={() => props.onPage('models')}>
             <Icon name="download-cloud-2-line" size={16} />
             Get models
           </button>

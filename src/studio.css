@@ -68,19 +68,10 @@ body {
   gap: var(--gap-inline);
   height: var(--session-row-height);
   padding: 0 calc(var(--space) * 2.5);
-  border: 0;
   border-radius: var(--r-ctl);
-  background: none;
-  color: var(--mut);
-  font: inherit;
   font-size: var(--fs-row);
   text-align: left;
   cursor: pointer;
-}
-
-.is-nav-row[data-on='true'] {
-  background: var(--selection);
-  color: var(--selection-ink);
 }
 
 .is-nav-row:focus-visible,
