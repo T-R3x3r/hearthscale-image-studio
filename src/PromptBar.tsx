@@ -347,7 +347,7 @@ export function PromptBar(props: {
               <span {...improve.hover} className="is-tipwrap">
                 <Tool
                   label="Improve my words"
-                  icon={props.helping ? 'loader-4-line' : 'magic-line'}
+                  icon={props.helping ? 'loader-4-line' : 'quill-pen-line'}
                   spin={props.helping}
                   disabled={props.helping || !props.words.trim()}
                   onClick={props.onImprove}

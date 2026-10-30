@@ -20,6 +20,7 @@ import {
   getRun,
   latestCompare,
   listPictures,
+  nameOf,
   openLibrary,
   picturesOfRun,
   runsOfCompare,
@@ -827,9 +828,11 @@ export function Studio() {
     page === 'compare'
       ? 'Compare models'
       : stagePicture
-        ? stagePicture.prompt || 'Opened picture'
+        ? stagePicture.prompt
+          ? nameOf(stagePicture.prompt)
+          : 'Opened picture'
         : stripRun && stripLive
-          ? stripRun.prompt
+          ? nameOf(stripRun.prompt)
           : 'New picture';
   const away = () => {
     if (cramped) setFolded(true);
@@ -1010,7 +1013,7 @@ export function Studio() {
         <Lightbox
           items={lightboxItems.map((p) => ({
             src: fileUrl(p.path),
-            name: p.prompt || 'Picture',
+            name: p.prompt ? nameOf(p.prompt) : 'Picture',
             onSave: () => void saveAs(p),
           }))}
           start={Math.min(large, lightboxItems.length - 1)}

@@ -1,7 +1,7 @@
 import type { ModelCard } from '@hearthscale/app';
 import { Button, Chip, Icon, Meter, Notice, StatusWord, useFloatingTips } from '@hearthscale/app-ui';
 import { assetUrl, fileUrl } from './bridge';
-import type { Picture, Run } from './records';
+import { nameOf, type Picture, type Run } from './records';
 import type { Live } from './runs';
 
 /** The most models one compare runs. */
@@ -49,7 +49,7 @@ export function ComparePage(props: {
         )}
         {props.columns.length > 0 && (
           <>
-            <div className="is-compare-prompt">{props.columns[0].run.prompt}</div>
+            <div className="is-compare-prompt">{nameOf(props.columns[0].run.prompt)}</div>
             <div
               className="is-compare-grid"
               style={{ gridTemplateColumns: `repeat(${props.columns.length}, minmax(0, var(--compare-column)))` }}
