@@ -810,6 +810,8 @@ export function Studio() {
       ? `${stripRun.action === 'make' ? 'Making' : stripRun.action === 'enlarge' ? 'Enlarging' : 'Changing'} with ${stripRun.label}…`
       : '',
     noModel: !!models && imageCards.length === 0,
+    unavailable: models?.unavailable ?? null,
+    onRetry: () => void refreshModels(),
     suggestion: suggestedImage
       ? { label: suggestedImage.label, downloading: suggestedImage.state === 'downloading' }
       : null,
@@ -961,6 +963,8 @@ export function Studio() {
             columns={columns}
             onShow={(picture) => (setPage('studio'), void show(picture))}
             onCancel={(run) => void cancelRun(run)}
+            unavailable={models?.unavailable ?? null}
+            onRetry={() => void refreshModels()}
           />
         )}
         <div className="is-dock">

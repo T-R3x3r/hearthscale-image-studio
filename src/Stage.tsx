@@ -9,6 +9,7 @@ import {
   MItem,
   MenuSurface,
   Meter,
+  Notice,
   PictureCompare,
   Slider,
   StatusWord,
@@ -153,6 +154,9 @@ export interface StageProps {
   live: Live | null;
   liveLabel: string;
   noModel: boolean;
+  /** Why no image model can run, where no Server offers one to install. */
+  unavailable: string | null;
+  onRetry: () => void;
   /** The image model the Server suggests when none is there, or the one it downloads. */
   suggestion: { label: string; downloading: boolean } | null;
   onInstall: () => void;
@@ -256,14 +260,19 @@ export function Stage(props: StageProps) {
   } else if (props.noModel) {
     body = props.suggestion?.downloading ? (
       <EmptyState icon={<Icon name="image-ai-line" size={30} />} title={`Downloading ${props.suggestion.label}…`} />
-    ) : (
+    ) : props.suggestion ? (
       <EmptyState icon={<Icon name="image-ai-line" size={30} />} title="No image model">
-        {props.suggestion && (
-          <Button variant="secondary" icon={<Icon name="download-2-line" size={14} />} onClick={props.onInstall}>
-            Install {props.suggestion.label}
-          </Button>
-        )}
+        <Button variant="secondary" icon={<Icon name="download-2-line" size={14} />} onClick={props.onInstall}>
+          Install {props.suggestion.label}
+        </Button>
       </EmptyState>
+    ) : (
+      <Notice>
+        {props.unavailable}
+        <button className="hs-link" onClick={props.onRetry}>
+          Try again
+        </button>
+      </Notice>
     );
   } else {
     body = (

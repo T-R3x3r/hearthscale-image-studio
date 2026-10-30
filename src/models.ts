@@ -51,6 +51,8 @@ export interface Models {
   chat: ModelCard | null;
   /** The image model the platform picks for the app. */
   chosen: string | null;
+  /** Why the platform picks no image model for the app, in Hearthscale's words. */
+  unavailable: string | null;
   /** The upscale model the platform picks for the app. */
   upscaleChosen: string | null;
   absentImage: ModelCard[];
@@ -69,11 +71,13 @@ export async function readModels(): Promise<Models> {
     call('hearthscale/models/list', { kind: 'upscale', state: 'downloading' }),
   ]);
   const chatCard = chat.chosen.chat?.card;
+  const imageChoice = image.chosen.image;
   return {
     image: image.cards,
     upscale: upscale.cards,
     chat: chat.cards.find((card) => card.id === chatCard) ?? null,
-    chosen: image.chosen.image?.card ?? null,
+    chosen: imageChoice?.card ?? null,
+    unavailable: imageChoice && 'reason' in imageChoice ? imageChoice.reason : null,
     upscaleChosen: upscale.chosen.upscale?.card ?? null,
     absentImage: absentImage.cards,
     absentUpscale: absentUpscale.cards,

@@ -36,6 +36,9 @@ export function ComparePage(props: {
   columns: Column[];
   onShow: (picture: Picture) => void;
   onCancel: (run: string) => void;
+  /** Why no image model can run, in Hearthscale's words. */
+  unavailable: string | null;
+  onRetry: () => void;
 }) {
   const tips = useFloatingTips('top');
   const flip = (id: string) => {
@@ -46,7 +49,14 @@ export function ComparePage(props: {
     <PublisherPicturesContext value={publisherPicture}>
       <div className="hs-scroll hs-settings-scroll is-page">
         <main className="is-compare-page">
-          {props.models.length < 2 ? (
+          {props.models.length === 0 && props.unavailable ? (
+            <Notice>
+              {props.unavailable}
+              <button className="hs-link" onClick={props.onRetry}>
+                Try again
+              </button>
+            </Notice>
+          ) : props.models.length < 2 ? (
             <Notice>Compare needs at least two image models.</Notice>
           ) : (
             <div className="is-compare-pick">
