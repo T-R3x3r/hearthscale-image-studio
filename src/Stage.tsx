@@ -430,6 +430,7 @@ export function StageBar(props: StageProps) {
   } else if (isSource && props.tool === 'brush') {
     bar = (
       <>
+        {amount}
         <BarSlider
           compact={props.compact}
           label="Brush size"
@@ -440,7 +441,6 @@ export function StageBar(props: StageProps) {
           onChange={props.onBrushSize}
           shown={`${props.brushSize}`}
         />
-        {amount}
         {explained(
           'eraser',
           'Rub out brush strokes',
@@ -506,6 +506,7 @@ export function StageBar(props: StageProps) {
   } else if (isSource) {
     bar = (
       <>
+        {amount}
         {props.showMode &&
           explained(
             'mode',
@@ -520,7 +521,6 @@ export function StageBar(props: StageProps) {
               onChange={props.onMode}
             />,
           )}
-        {amount}
         {props.narrow ? (
           <>
             {explained(
