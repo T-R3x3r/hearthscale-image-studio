@@ -28,7 +28,7 @@ export interface Run {
   finished: number | null;
 }
 
-export type Action = 'make' | 'change' | 'edit' | 'fill' | 'erase' | 'extend' | 'bigger' | 'open';
+export type Action = 'make' | 'change' | 'edit' | 'fill' | 'erase' | 'extend' | 'enlarge' | 'open';
 
 /** One picture of a run, as a file of the app's data folder. */
 export interface Picture {

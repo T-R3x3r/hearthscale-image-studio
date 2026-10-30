@@ -130,7 +130,7 @@ export function ModelsPage(props: {
                     actions={
                       <>
                         <span className="is-model-meter">
-                          <Meter value={share} label={`How much of ${card.label} has arrived`} />
+                          <Meter value={share} label={`Download of ${card.label}`} />
                         </span>
                         <span className="is-size">{Math.round(share * 100)}%</span>
                       </>
@@ -170,7 +170,7 @@ export function ModelsPage(props: {
               actions={
                 <>
                   {size(card.sizeBytes)}
-                  <Chip>For Bigger</Chip>
+                  <Chip>Used by Enlarge</Chip>
                 </>
               }
             />
@@ -188,7 +188,7 @@ export function ModelsPage(props: {
                   actions={
                     <>
                       {size(card.sizeBytes)}
-                      {card.kind === 'upscale' && <Chip>For Bigger</Chip>}
+                      {card.kind === 'upscale' && <Chip>Used by Enlarge</Chip>}
                       {installButton(() => void install(card.id))}
                     </>
                   }

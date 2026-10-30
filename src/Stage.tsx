@@ -37,7 +37,7 @@ export interface PictureActions {
   edit?: () => void;
   addToPrompt?: () => void;
   vary?: (how: 'little' | 'lot') => void;
-  bigger?: () => void;
+  enlarge?: () => void;
   plainBackground?: () => void;
   compareSource?: () => void;
   favourite: () => void;
@@ -247,7 +247,7 @@ export function Stage(props: StageProps) {
           ) : (
             <span>{props.liveLabel}</span>
           )}
-          <Meter value={props.live.fraction} label="How far the picture is" />
+          <Meter value={props.live.fraction} label="Progress" />
         </div>
       </div>
     );
@@ -315,7 +315,7 @@ export function StageBar(props: StageProps) {
           />
         </div>
         <Chip selected={props.erasing} onClick={() => props.onErasing(!props.erasing)}>
-          Rub out
+          Eraser
         </Chip>
         <Button variant="ghost" size="sm" onClick={props.onClearStrokes}>
           Clear
@@ -335,10 +335,10 @@ export function StageBar(props: StageProps) {
             {side[0].toUpperCase() + side.slice(1)}
           </Chip>
         ))}
-        <span className="is-bar-label">How much more</span>
+        <span className="is-bar-label">Extend by</span>
         <div className="is-bar-slider">
           <Slider
-            label="How much more"
+            label="Extend by"
             min={0.1}
             max={0.5}
             step={0.05}
@@ -378,7 +378,7 @@ export function StageBar(props: StageProps) {
     );
   } else if (picture && actions) {
     const favourite = tip('favourite', picture.favourite ? 'Remove from favourites' : 'Add to favourites');
-    const save = tip('save', 'Save as');
+    const save = tip('save', 'Save as…');
     const more = tip('more', 'More');
     bar = (
       <>
@@ -398,9 +398,9 @@ export function StageBar(props: StageProps) {
             Vary
           </Button>
         )}
-        {actions.bigger && !props.narrow && (
-          <Button variant="secondary" size="sm" icon={<Icon name="zoom-in-line" size={14} />} onClick={actions.bigger}>
-            Bigger
+        {actions.enlarge && !props.narrow && (
+          <Button variant="secondary" size="sm" icon={<Icon name="zoom-in-line" size={14} />} onClick={actions.enlarge}>
+            Enlarge
           </Button>
         )}
         <span {...favourite.hover} className="is-tipwrap">
@@ -416,7 +416,7 @@ export function StageBar(props: StageProps) {
         </span>
         {!props.narrow && (
           <span {...save.hover} className="is-tipwrap">
-            <IconButton aria-label="Save as" onClick={actions.save}>
+            <IconButton aria-label="Save as…" onClick={actions.save}>
               <Icon name="download-2-line" size={16} />
             </IconButton>
             {save.tip}
@@ -457,17 +457,17 @@ export function StageBar(props: StageProps) {
               />
             </>
           )}
-          {props.narrow && actions.bigger && (
+          {props.narrow && actions.enlarge && (
             <MItem
               icon={<Icon name="zoom-in-line" size={14} />}
-              label="Bigger"
-              onClick={() => (setMenu(null), actions.bigger!())}
+              label="Enlarge"
+              onClick={() => (setMenu(null), actions.enlarge!())}
             />
           )}
           {props.narrow && (
             <MItem
               icon={<Icon name="download-2-line" size={14} />}
-              label="Save as"
+              label="Save as…"
               onClick={() => (setMenu(null), actions.save())}
             />
           )}
@@ -488,7 +488,7 @@ export function StageBar(props: StageProps) {
           {actions.compareSource && (
             <MItem
               icon={<Icon name="contrast-2-line" size={14} />}
-              label="Compare with the picture before"
+              label="Compare with the original"
               onClick={() => (setMenu(null), actions.compareSource!())}
             />
           )}

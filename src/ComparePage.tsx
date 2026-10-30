@@ -78,7 +78,7 @@ export function ComparePage(props: {
                         ) : (
                           <Icon name="image-ai-line" size={28} className="is-making-mark" />
                         )}
-                        <Meter value={live.fraction} label={`How far ${run.label} is`} />
+                        <Meter value={live.fraction} label={`Progress of ${run.label}`} />
                         <Button variant="ghost" size="sm" onClick={() => props.onCancel(run.id)}>
                           Cancel
                         </Button>

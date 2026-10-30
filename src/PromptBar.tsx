@@ -248,7 +248,7 @@ export function PromptBar(props: {
             )}
           </Menu>
           {props.showCount && props.abilities.count > 1 && (
-            <Menu label="How many" value={props.count === 1 ? '1 picture' : `${props.count} pictures`}>
+            <Menu label="Number of pictures" value={props.count === 1 ? '1 picture' : `${props.count} pictures`}>
               {(close) =>
                 [1, 2, 4]
                   .filter((n) => n <= props.abilities.count)
@@ -274,17 +274,17 @@ export function PromptBar(props: {
               label="How to change the picture"
               value={props.mode}
               options={[
-                { value: 'edit', label: 'Follow my words' },
+                { value: 'edit', label: 'Edit' },
                 { value: 'redraw', label: 'Redraw' },
               ]}
               onChange={props.onMode}
             />
           )}
-          {props.amount !== null && <span className="is-bar-label">How much</span>}
+          {props.amount !== null && <span className="is-bar-label">Amount</span>}
           {props.amount !== null && (
             <div className="is-amount">
               <Slider
-                label="How much to change"
+                label="Amount"
                 value={props.amount}
                 onChange={props.onAmount}
                 min={0.05}

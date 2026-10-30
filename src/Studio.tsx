@@ -68,7 +68,7 @@ const LABELS: Record<Action | 'compare', string> = {
   fill: 'Fill',
   erase: 'Erase',
   extend: 'Extend',
-  bigger: 'Bigger',
+  enlarge: 'Enlarge',
   open: 'Open',
   compare: 'Compare',
 };
@@ -588,12 +588,12 @@ export function Studio() {
     await begin(next, { prompt: styled.prompt, ...sizes, ...settings.input });
   }
 
-  async function bigger(picture: Picture) {
+  async function enlarge(picture: Picture) {
     if (!upscaler) return setPage('models');
     const inputs = await hold([picture.path]);
     const run = newRun({
       kind: 'upscale',
-      action: 'bigger',
+      action: 'enlarge',
       model: upscaler.id,
       label: upscaler.label,
       prompt: picture.prompt,
@@ -742,9 +742,9 @@ export function Studio() {
         vary: abilities.change
           ? (how) => void change('change', shown, VARY[how], shown.prompt).catch((e) => setProblem(reason(e)))
           : undefined,
-        bigger:
+        enlarge:
           upscaler || (models?.absentUpscale.length ?? 0) > 0
-            ? () => void bigger(shown).catch((e) => setProblem(reason(e)))
+            ? () => void enlarge(shown).catch((e) => setProblem(reason(e)))
             : undefined,
         plainBackground: abilities.edit
           ? () => void change('edit', shown, 1, PLAIN_BACKGROUND_WORDS).catch((e) => setProblem(reason(e)))
@@ -783,7 +783,7 @@ export function Studio() {
     onStopCompare: () => setComparing(false),
     live: stripLive,
     liveLabel: stripRun
-      ? `${stripRun.action === 'make' ? 'Making' : stripRun.action === 'bigger' ? 'Making it bigger' : 'Changing'} with ${stripRun.label}`
+      ? `${stripRun.action === 'make' ? 'Making' : stripRun.action === 'enlarge' ? 'Enlarging' : 'Changing'} with ${stripRun.label}…`
       : '',
     noModel: !!models && imageCards.length === 0,
     onGetModels: () => setPage('models'),
@@ -892,7 +892,7 @@ export function Studio() {
                 {stripLive &&
                   Array.from({ length: Math.max(1, stripRun.count - strip.length) }, (_, i) => (
                     <div key={`making-${i}`} className="is-strip-item" data-making>
-                      <Meter value={stripLive.fraction} label="How far the picture is" variant="ring" />
+                      <Meter value={stripLive.fraction} label="Progress" variant="ring" />
                     </div>
                   ))}
                 {stripLive ? (
@@ -913,7 +913,7 @@ export function Studio() {
                       icon={<Icon name="add-line" size={14} />}
                       onClick={() => void more().catch((e) => setProblem(reason(e)))}
                     >
-                      More
+                      Make more
                     </Button>
                   )
                 )}
