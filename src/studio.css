@@ -98,6 +98,7 @@ body {
 
 .hs-model-trigger:focus-visible,
 .is-tool:focus-visible,
+.is-bar-toggle:focus-visible,
 .is-nav-row:focus-visible {
   outline: none;
   box-shadow: var(--focus);
@@ -346,6 +347,21 @@ body {
 .is-bar-slider {
   width: calc(var(--space) * 48);
   margin-right: var(--gap-row);
+}
+
+.is-bar-toggle {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  height: var(--h-ctl);
+  padding: var(--pad-ctl);
+  box-sizing: border-box;
+  border: var(--bw) solid transparent;
+  border-radius: var(--r-ctl);
+  font: inherit;
+  font-size: var(--fs-body);
+  white-space: nowrap;
+  cursor: pointer;
 }
 
 .is-bar-label {

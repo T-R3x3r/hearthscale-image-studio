@@ -141,6 +141,21 @@ function Brush(props: {
   );
 }
 
+/** A press of the bar that stays on: as high as the bar's buttons, on the
+ *  selected plate while it is on. */
+function BarToggle(props: { on: boolean; onClick: () => void; children: ReactNode }) {
+  return (
+    <button
+      type="button"
+      className={`is-bar-toggle hs-hovbox-ink ${props.on ? 'hs-boxsel' : 'hs-inkmut'}`}
+      aria-pressed={props.on}
+      onClick={props.onClick}
+    >
+      {props.children}
+    </button>
+  );
+}
+
 /** What the stage and its bar show, and what they report. */
 export interface StageProps {
   /** Whether the bar keeps only its main actions and puts the rest in the More menu. */
@@ -342,9 +357,9 @@ export function StageBar(props: StageProps) {
         {explained(
           'eraser',
           'Rub out brush strokes',
-          <Chip selected={props.erasing} onClick={() => props.onErasing(!props.erasing)}>
+          <BarToggle on={props.erasing} onClick={() => props.onErasing(!props.erasing)}>
             Eraser
-          </Chip>,
+          </BarToggle>,
         )}
         <Button variant="ghost" size="sm" onClick={props.onClearStrokes}>
           Clear
@@ -360,9 +375,9 @@ export function StageBar(props: StageProps) {
     bar = (
       <>
         {(['left', 'right', 'top', 'bottom'] as const).map((side) => (
-          <Chip key={side} selected={props.sides[side]} onClick={() => flip(side)}>
+          <BarToggle key={side} on={props.sides[side]} onClick={() => flip(side)}>
             {side[0].toUpperCase() + side.slice(1)}
-          </Chip>
+          </BarToggle>
         ))}
         <span className="is-bar-label">Extend by</span>
         <div className="is-bar-slider">
