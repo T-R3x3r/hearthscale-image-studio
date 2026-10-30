@@ -34,7 +34,13 @@ body {
   display: flex;
   align-items: center;
   gap: var(--space);
-  margin-left: auto;
+}
+
+.is-tool:disabled {
+  background: none;
+  box-shadow: none;
+  color: var(--dim);
+  cursor: default;
 }
 
 /* The library */
@@ -79,6 +85,8 @@ body {
   cursor: pointer;
 }
 
+.hs-model-trigger:focus-visible,
+.is-tool:focus-visible,
 .is-nav-row:focus-visible,
 .is-thumb:focus-visible,
 .is-strip-item:focus-visible,
@@ -519,6 +527,11 @@ body {
 }
 
 @media (width < 640px) {
+  /* The footer wraps in a narrow tile; its end keeps to the right. */
+  .is-prompt-end {
+    margin-left: auto;
+  }
+
   .is-studio {
     --studio-side: calc(var(--gap-row) + var(--scroll-size));
   }

@@ -1,9 +1,8 @@
-import { useRef, useState, type ReactNode } from 'react';
+import { useRef, useState, type MouseEvent, type ReactNode } from 'react';
 import type { ModelCard } from '@hearthscale/app';
 import {
   Button,
   Icon,
-  IconButton,
   MDivider,
   MItem,
   MSection,
@@ -14,6 +13,7 @@ import {
   TextField,
   anchorFrom,
   useFloatingTips,
+  type IconName,
   type MenuAnchor,
 } from '@hearthscale/app-ui';
 import { fileUrl } from './bridge';
@@ -31,20 +31,41 @@ export interface Advanced {
 
 export type Mode = 'edit' | 'redraw';
 
+/** A press of the composer's footer, in the composer's own tool look. */
+function Tool(props: {
+  label: string;
+  icon: IconName;
+  disabled?: boolean;
+  spin?: boolean;
+  onClick: (event: MouseEvent<HTMLButtonElement>) => void;
+}) {
+  return (
+    <button
+      type="button"
+      className="hs-composer-tool hs-hovbox-ink is-tool"
+      aria-label={props.label}
+      disabled={props.disabled}
+      onClick={props.onClick}
+    >
+      <Icon name={props.icon} size={16} className={props.spin ? 'hs-spin' : undefined} />
+    </button>
+  );
+}
+
 function Menu(props: { label: string; value: string; icon?: ReactNode; children: (close: () => void) => ReactNode }) {
   const [anchor, setAnchor] = useState<MenuAnchor | null>(null);
   return (
     <>
-      <Button
-        variant="ghost"
-        size="sm"
-        icon={props.icon}
-        trailingIcon={<Icon name="arrow-down-s-line" size={14} />}
+      <button
+        type="button"
+        className="hs-model-trigger hs-hovbox-ink"
         aria-label={props.label}
         onClick={(e) => setAnchor(anchorFrom(props.label, e))}
       >
-        {props.value}
-      </Button>
+        {props.icon}
+        <span className="hs-model-trigger-name">{props.value}</span>
+        <Icon name="arrow-down-s-line" size={14} className="hs-model-trigger-chevron" />
+      </button>
       {anchor && (
         <MenuSurface anchor={anchor} dir="up" maxHeight={360} onDismiss={() => setAnchor(null)}>
           {props.children(() => setAnchor(null))}
@@ -158,12 +179,11 @@ export function PromptBar(props: {
         <div className="hs-composer-footer is-prompt-row">
           {!props.comparing && (!props.source || props.canAddReference) && (
             <span {...add.hover} className="is-tipwrap">
-              <IconButton
-                aria-label={props.source ? 'Add a picture to the prompt' : 'Open a picture'}
+              <Tool
+                label={props.source ? 'Add a picture to the prompt' : 'Open a picture'}
+                icon="attachment-2"
                 onClick={() => file.current?.click()}
-              >
-                <Icon name="image-add-line" size={16} />
-              </IconButton>
+              />
               {add.tip}
             </span>
           )}
@@ -269,9 +289,12 @@ export function PromptBar(props: {
             </Menu>
           )}
           <span {...more.hover} className="is-tipwrap">
-            <IconButton aria-label="More settings" disabled={!settable} onClick={(e) => setAdvancedAt(e.currentTarget)}>
-              <Icon name="equalizer-line" size={16} />
-            </IconButton>
+            <Tool
+              label="More settings"
+              icon="equalizer-line"
+              disabled={!settable}
+              onClick={(e) => setAdvancedAt(e.currentTarget)}
+            />
             {more.tip}
           </span>
           {props.showMode &&
@@ -307,28 +330,28 @@ export function PromptBar(props: {
               />
             </div>
           )}
+          <span className="hs-composer-fill" />
           <span className="is-prompt-end">
             {props.onDescribe && (
               <span {...describe.hover} className="is-tipwrap">
-                <IconButton aria-label="Describe this picture" disabled={props.helping} onClick={props.onDescribe}>
-                  <Icon name="eye-line" size={16} />
-                </IconButton>
+                <Tool
+                  label="Describe this picture"
+                  icon="eye-line"
+                  disabled={props.helping}
+                  onClick={props.onDescribe}
+                />
                 {describe.tip}
               </span>
             )}
             {props.onImprove && (
               <span {...improve.hover} className="is-tipwrap">
-                <IconButton
-                  aria-label="Improve my words"
+                <Tool
+                  label="Improve my words"
+                  icon={props.helping ? 'loader-4-line' : 'magic-line'}
+                  spin={props.helping}
                   disabled={props.helping || !props.words.trim()}
                   onClick={props.onImprove}
-                >
-                  <Icon
-                    name={props.helping ? 'loader-4-line' : 'magic-line'}
-                    size={16}
-                    className={props.helping ? 'hs-spin' : undefined}
-                  />
-                </IconButton>
+                />
                 {improve.tip}
               </span>
             )}
