@@ -391,6 +391,13 @@ body {
   width: calc(var(--space) * 56);
 }
 
+/* A slider of the bar and its label, one group of the bar. */
+.is-bar-field {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--gap-inline);
+}
+
 .is-bar-label {
   margin-left: var(--gap-row);
   color: var(--mut);
@@ -488,10 +495,6 @@ body {
 
 .is-prompt-row {
   flex-wrap: wrap;
-}
-
-.is-amount {
-  width: calc(var(--space) * 50);
 }
 
 .is-advanced {
@@ -639,9 +642,5 @@ body {
 @media (width < 640px) {
   .is-studio {
     --studio-inset: var(--gap-row);
-  }
-
-  .is-amount {
-    width: calc(var(--space) * 30);
   }
 }

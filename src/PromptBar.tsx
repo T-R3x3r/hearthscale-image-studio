@@ -160,8 +160,6 @@ export function PromptBar(props: {
   comparing: boolean;
   advanced: Advanced;
   onAdvanced: (advanced: Advanced) => void;
-  amount: number | null;
-  onAmount: (amount: number) => void;
   onImprove: (() => void) | null;
   onDescribe: (() => void) | null;
   helping: boolean;
@@ -328,25 +326,6 @@ export function PromptBar(props: {
             />
             {more.tip}
           </span>
-          {props.amount !== null &&
-            explained(
-              'amount',
-              'How far the new picture may move from this one',
-              <span className="is-bar-label">Amount</span>,
-            )}
-          {props.amount !== null && (
-            <div className="is-amount">
-              <Slider
-                label="Amount"
-                value={props.amount}
-                onChange={props.onAmount}
-                min={0.05}
-                max={1}
-                step={0.05}
-                shown={`${Math.round(props.amount * 100)}%`}
-              />
-            </div>
-          )}
           {props.comparing ? <span className="hs-composer-fill" /> : <ModelSlot />}
           <span className="is-prompt-end">
             {props.onDescribe && (

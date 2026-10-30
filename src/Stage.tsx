@@ -186,10 +186,10 @@ function BarSlider(props: {
   );
   if (!props.compact) {
     return (
-      <>
+      <span className="is-bar-field">
         <span className="is-bar-label">{props.label}</span>
         <div className="is-bar-slider">{slider}</div>
-      </>
+      </span>
     );
   }
   return (
@@ -251,6 +251,9 @@ export interface StageProps {
   margins: Margins | null;
   mode: Mode;
   onMode: (mode: Mode) => void;
+  /** How far a change may move from the picture, where the action takes it. */
+  amount: number | null;
+  onAmount: (amount: number) => void;
   /** Whether the model can change a picture both ways, so the bar offers the choice. */
   showMode: boolean;
   actions: PictureActions | null;
@@ -400,6 +403,23 @@ export function StageBar(props: StageProps) {
     );
   };
 
+  const amount =
+    props.amount !== null &&
+    explained(
+      'amount',
+      'How far the new picture may move from this one',
+      <BarSlider
+        compact={props.compact}
+        label="Amount"
+        min={0.05}
+        max={1}
+        step={0.05}
+        value={props.amount}
+        onChange={props.onAmount}
+        shown={`${Math.round(props.amount * 100)}%`}
+      />,
+    );
+
   let bar = null;
   if (props.comparing) {
     bar = (
@@ -420,6 +440,7 @@ export function StageBar(props: StageProps) {
           onChange={props.onBrushSize}
           shown={`${props.brushSize}`}
         />
+        {amount}
         {explained(
           'eraser',
           'Rub out brush strokes',
@@ -499,6 +520,7 @@ export function StageBar(props: StageProps) {
               onChange={props.onMode}
             />,
           )}
+        {amount}
         {props.narrow ? (
           <>
             {explained(

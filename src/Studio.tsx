@@ -875,6 +875,8 @@ export function Studio() {
     compact: mainWidth < ROOMY,
     mode,
     onMode: setMode,
+    amount: action === 'change' || action === 'fill' ? amount : null,
+    onAmount: setAmount,
     showMode:
       editing && abilities.edit && abilities.change && action !== 'fill' && action !== 'erase' && action !== 'extend',
     picture: stagePicture,
@@ -1080,8 +1082,6 @@ export function Studio() {
             comparing={action === 'compare'}
             advanced={advanced}
             onAdvanced={setAdvanced}
-            amount={action === 'change' || action === 'fill' ? amount : null}
-            onAmount={setAmount}
             onImprove={chat ? () => void improve() : null}
             onDescribe={
               chat?.vision && (editing ? source : shown) ? () => void describe((editing ? source : shown)!) : null
