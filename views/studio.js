@@ -390,8 +390,10 @@ body {
 }
 
 /* A page keeps the scrollbar's room on both sides; its padding makes up
-   the rest of the inset, so its edges meet the prompt's. */
+   the rest of the inset, so its edges meet the prompt's and its top meets
+   the stage's. */
 .is-page {
+  padding-top: var(--studio-inset);
   padding-right: calc(var(--studio-inset) - var(--scroll-size));
   padding-left: calc(var(--studio-inset) - var(--scroll-size));
 }
@@ -454,7 +456,7 @@ body {
 .is-compare-page {
   display: flex;
   flex-direction: column;
-  gap: var(--gap-stack);
+  gap: var(--gap-row);
   width: 100%;
   max-width: var(--studio-column);
   margin: 0 auto;
@@ -467,7 +469,6 @@ body {
 }
 
 .is-compare-prompt {
-  padding-top: var(--gap-stack);
   color: var(--mut);
   font-size: var(--fs-row);
 }
