@@ -1,0 +1,162 @@
+import { fileUrl, host } from './bridge';
+
+const sizes = new Map<string, Promise<{ width: number; height: number }>>();
+
+/** The width and height of a picture of the library. */
+export function sizeOf(path: string): Promise<{ width: number; height: number }> {
+  let known = sizes.get(path);
+  if (!known) {
+    known = new Promise((resolve, reject) => {
+      const image = new Image();
+      image.onload = () => resolve({ width: image.naturalWidth, height: image.naturalHeight });
+      image.onerror = () => reject(new Error('The picture did not load.'));
+      image.src = fileUrl(path);
+    });
+    sizes.set(path, known);
+  }
+  return known;
+}
+
+export async function blobOf(path: string): Promise<Blob> {
+  const answer = await fetch(fileUrl(path));
+  if (!answer.ok) throw new Error(await answer.text());
+  return answer.blob();
+}
+
+function loadImage(src: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error('The picture did not load.'));
+    image.src = src;
+  });
+}
+
+function toPng(canvas: HTMLCanvasElement): Promise<Blob> {
+  return new Promise((resolve, reject) =>
+    canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error('The picture could not be made.'))), 'image/png'),
+  );
+}
+
+async function upload(name: string, blob: Blob): Promise<string> {
+  const { asset } = await host('hearthscale/ui/upload-file', { name, mediaType: 'image/png', blob });
+  return asset;
+}
+
+/** The largest picture a person's own file becomes, as an area. */
+const OPENED_AREA = 1024 * 1024;
+
+/** A picture the person opened, made a PNG a job takes: scaled down to the
+ *  area a model draws well and cut to multiples of 64 on each side. */
+export async function preparedUpload(file: Blob): Promise<string> {
+  const url = URL.createObjectURL(file);
+  try {
+    const image = await loadImage(url);
+    const scale = Math.min(1, Math.sqrt(OPENED_AREA / (image.naturalWidth * image.naturalHeight)));
+    const scaledWidth = image.naturalWidth * scale;
+    const scaledHeight = image.naturalHeight * scale;
+    const width = Math.max(64, Math.floor(scaledWidth / 64) * 64);
+    const height = Math.max(64, Math.floor(scaledHeight / 64) * 64);
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    canvas.getContext('2d')!.drawImage(image, (width - scaledWidth) / 2, (height - scaledHeight) / 2, scaledWidth, scaledHeight);
+    return await upload('picture.png', await toPng(canvas));
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
+/** A mask a job takes from the strokes of the brush: white where the
+ *  strokes cover the picture, black elsewhere. */
+export async function maskUpload(strokes: HTMLCanvasElement): Promise<string> {
+  const canvas = document.createElement('canvas');
+  canvas.width = strokes.width;
+  canvas.height = strokes.height;
+  const context = canvas.getContext('2d')!;
+  context.drawImage(strokes, 0, 0);
+  const pixels = context.getImageData(0, 0, canvas.width, canvas.height);
+  for (let i = 0; i < pixels.data.length; i += 4) {
+    const on = pixels.data[i + 3] > 0 ? 255 : 0;
+    pixels.data[i] = on;
+    pixels.data[i + 1] = on;
+    pixels.data[i + 2] = on;
+    pixels.data[i + 3] = 255;
+  }
+  context.putImageData(pixels, 0, 0);
+  return upload('mask.png', await toPng(canvas));
+}
+
+/** How many pixels each side of a picture grows by. */
+export interface Margins {
+  left: number;
+  right: number;
+  top: number;
+  bottom: number;
+}
+
+/** The margins an extend adds: a share of the picture's width or height
+ *  on each chosen side, as a multiple of 64. */
+export function marginsOf(
+  size: { width: number; height: number },
+  sides: { left: boolean; right: boolean; top: boolean; bottom: boolean },
+  share: number,
+): Margins {
+  const grow = (side: number) => Math.max(64, Math.round((side * share) / 64) * 64);
+  return {
+    left: sides.left ? grow(size.width) : 0,
+    right: sides.right ? grow(size.width) : 0,
+    top: sides.top ? grow(size.height) : 0,
+    bottom: sides.bottom ? grow(size.height) : 0,
+  };
+}
+
+/** Where an extended picture's new border overlaps the old picture, so the
+ *  seam is drawn anew too. */
+const SEAM = 16;
+
+/** The picture of an extend and its mask: the picture in place on a larger
+ *  canvas, the new border filled with a blur of the picture so the model
+ *  starts from its colours, and a mask that is white over the border. */
+export async function extendUploads(path: string, margins: Margins): Promise<{ image: string; mask: string; width: number; height: number }> {
+  const picture = await loadImage(fileUrl(path));
+  const width = picture.naturalWidth + margins.left + margins.right;
+  const height = picture.naturalHeight + margins.top + margins.bottom;
+
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const context = canvas.getContext('2d')!;
+  context.filter = 'blur(32px)';
+  context.drawImage(picture, 0, 0, width, height);
+  context.filter = 'none';
+  context.drawImage(picture, margins.left, margins.top);
+
+  const mask = document.createElement('canvas');
+  mask.width = width;
+  mask.height = height;
+  const ink = mask.getContext('2d')!;
+  ink.fillStyle = '#ffffff';
+  ink.fillRect(0, 0, width, height);
+  ink.fillStyle = '#000000';
+  const inset = (margin: number) => (margin > 0 ? SEAM : 0);
+  ink.fillRect(
+    margins.left + inset(margins.left),
+    margins.top + inset(margins.top),
+    picture.naturalWidth - inset(margins.left) - inset(margins.right),
+    picture.naturalHeight - inset(margins.top) - inset(margins.bottom),
+  );
+
+  const [image, maskAsset] = await Promise.all([upload('extended.png', await toPng(canvas)), upload('mask.png', await toPng(mask))]);
+  return { image, mask: maskAsset, width, height };
+}
+
+/** A file name for a saved picture, from its words and its number. */
+export function fileName(prompt: string, seed: number | null): string {
+  const words = prompt
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 48);
+  return `${words || 'picture'}${seed !== null ? `-${seed}` : ''}.png`;
+}

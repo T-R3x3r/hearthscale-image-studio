@@ -1,0 +1,117 @@
+{
+  "$schema": "https://hearthscale.com/app.schema.json",
+  "id": "image-studio",
+  "name": "Image Studio",
+  "version": "0.1.0",
+  "api": 6,
+  "icon": { "light": "assets/icon-light.svg", "dark": "assets/icon-dark.svg" },
+  "description": "Make and change pictures with the image models on this computer.",
+  "license": "MIT",
+  "categories": ["design"],
+  "payment": "free",
+  "environment": { "kind": "process" },
+  "uses": ["jobs", "models", "db", "store", "files.open"],
+  "models": {
+    "image": { "required": true },
+    "upscale": { "required": false },
+    "chat": { "required": false }
+  },
+  "permissions": ["clipboard-write"],
+  "surfaces": [
+    {
+      "id": "studio",
+      "kind": "view",
+      "title": "Image Studio",
+      "entry": "views/studio.js",
+      "placements": ["rail", "tab"]
+    }
+  ],
+  "tools": [
+    {
+      "name": "make",
+      "title": "Make pictures",
+      "description": "Runs one picture job and saves its pictures in the app's folder of the run.",
+      "input": {
+        "type": "object",
+        "properties": {
+          "run": { "type": "string", "pattern": "^[a-z0-9-]{8,40}$" },
+          "kind": { "type": "string", "enum": ["image", "upscale"] },
+          "model": { "type": "string", "minLength": 1 },
+          "input": { "type": "object" }
+        },
+        "required": ["run", "kind", "model", "input"]
+      },
+      "mutating": false,
+      "outbound": false,
+      "visibility": ["app"]
+    },
+    {
+      "name": "hold",
+      "title": "Read pictures",
+      "description": "Reads pictures of the library as assets a job or a model can take.",
+      "input": {
+        "type": "object",
+        "properties": {
+          "paths": {
+            "type": "array",
+            "items": { "type": "string", "pattern": "^pictures/[a-z0-9-]+/[a-z0-9-]+\\.png$" },
+            "minItems": 1,
+            "maxItems": 11
+          }
+        },
+        "required": ["paths"]
+      },
+      "mutating": false,
+      "outbound": false,
+      "visibility": ["app"]
+    },
+    {
+      "name": "release",
+      "title": "Let go of pictures",
+      "description": "Drops the assets a finished job read.",
+      "input": {
+        "type": "object",
+        "properties": { "assets": { "type": "array", "items": { "type": "string" } } },
+        "required": ["assets"]
+      },
+      "mutating": false,
+      "outbound": false,
+      "visibility": ["app"]
+    },
+    {
+      "name": "keep",
+      "title": "Add a picture",
+      "description": "Adds a picture the person opened to the library.",
+      "input": {
+        "type": "object",
+        "properties": {
+          "asset": { "type": "string" },
+          "run": { "type": "string", "pattern": "^[a-z0-9-]{8,40}$" }
+        },
+        "required": ["asset", "run"]
+      },
+      "mutating": false,
+      "outbound": false,
+      "visibility": ["app"]
+    },
+    {
+      "name": "remove",
+      "title": "Delete pictures",
+      "description": "Deletes pictures of the library and their files.",
+      "input": {
+        "type": "object",
+        "properties": {
+          "paths": {
+            "type": "array",
+            "items": { "type": "string", "pattern": "^pictures/[a-z0-9-]+/[a-z0-9-]+\\.png$" },
+            "minItems": 1
+          }
+        },
+        "required": ["paths"]
+      },
+      "mutating": true,
+      "outbound": false,
+      "visibility": ["app"]
+    }
+  ]
+}
