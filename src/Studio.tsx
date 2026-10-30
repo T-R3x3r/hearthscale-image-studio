@@ -44,8 +44,8 @@ import {
 } from './recipes';
 import { cancelRun, newId, onEnded, recoverRuns, startRun, useLive } from './runs';
 import { Library } from './Library';
-import { Stage, StageBar, type PictureActions, type Sides, type StageProps, type Tool } from './Stage';
-import { PromptBar, type Advanced, type Mode } from './PromptBar';
+import { Stage, StageBar, type Mode, type PictureActions, type Sides, type StageProps, type Tool } from './Stage';
+import { PromptBar, type Advanced } from './PromptBar';
 import { ComparePage, type Column } from './ComparePage';
 
 type Page = 'studio' | 'compare';
@@ -787,6 +787,10 @@ export function Studio() {
   const suggestedImage = models?.downloading.find((card) => card.kind === 'image') ?? models?.absentImage[0] ?? null;
   const stageProps: StageProps = {
     narrow,
+    mode,
+    onMode: setMode,
+    showMode:
+      editing && abilities.edit && abilities.change && action !== 'fill' && action !== 'erase' && action !== 'extend',
     picture: stagePicture,
     size: stageSize,
     source,
@@ -995,16 +999,6 @@ export function Studio() {
             comparing={action === 'compare'}
             advanced={advanced}
             onAdvanced={setAdvanced}
-            mode={mode}
-            onMode={setMode}
-            showMode={
-              editing &&
-              abilities.edit &&
-              abilities.change &&
-              action !== 'fill' &&
-              action !== 'erase' &&
-              action !== 'extend'
-            }
             amount={action === 'change' || action === 'fill' ? amount : null}
             onAmount={setAmount}
             onImprove={chat ? () => void improve() : null}

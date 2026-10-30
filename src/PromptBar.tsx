@@ -7,7 +7,6 @@ import {
   MSection,
   MenuSurface,
   Popover,
-  SegmentedControl,
   Slider,
   TextField,
   anchorFrom,
@@ -26,8 +25,6 @@ export interface Advanced {
   guidance: string;
   seed: string;
 }
-
-export type Mode = 'edit' | 'redraw';
 
 /** A press of the composer's footer, in the composer's own tool look. */
 function Tool(props: {
@@ -136,9 +133,6 @@ export function PromptBar(props: {
   comparing: boolean;
   advanced: Advanced;
   onAdvanced: (advanced: Advanced) => void;
-  mode: Mode;
-  onMode: (mode: Mode) => void;
-  showMode: boolean;
   amount: number | null;
   onAmount: (amount: number) => void;
   onImprove: (() => void) | null;
@@ -306,20 +300,6 @@ export function PromptBar(props: {
             />
             {more.tip}
           </span>
-          {props.showMode &&
-            explained(
-              'mode',
-              'Edit changes what you name; Redraw paints the picture again from your words',
-              <SegmentedControl
-                label="How to change the picture"
-                value={props.mode}
-                options={[
-                  { value: 'edit', label: 'Edit' },
-                  { value: 'redraw', label: 'Redraw' },
-                ]}
-                onChange={props.onMode}
-              />,
-            )}
           {props.amount !== null &&
             explained(
               'amount',

@@ -11,6 +11,7 @@ import {
   Meter,
   Notice,
   PictureCompare,
+  SegmentedControl,
   Slider,
   StatusWord,
   anchorFrom,
@@ -24,6 +25,9 @@ import { IDEAS } from './recipes';
 import { paintStrokes, type Margins, type Stroke } from './pictures';
 
 export type Tool = 'none' | 'brush' | 'extend';
+
+/** How a change of a picture works: by the edit model's words, or drawn again. */
+export type Mode = 'edit' | 'redraw';
 
 export interface Sides {
   left: boolean;
@@ -189,6 +193,10 @@ export interface StageProps {
   sides: Sides;
   onSides: (sides: Sides) => void;
   margins: Margins | null;
+  mode: Mode;
+  onMode: (mode: Mode) => void;
+  /** Whether the model can change a picture both ways, so the bar offers the choice. */
+  showMode: boolean;
   actions: PictureActions | null;
   onStopEditing: () => void;
 }
@@ -399,6 +407,20 @@ export function StageBar(props: StageProps) {
   } else if (isSource) {
     bar = (
       <>
+        {props.showMode &&
+          explained(
+            'mode',
+            'Edit changes what you name; Redraw paints the picture again from your words',
+            <SegmentedControl
+              label="How to change the picture"
+              value={props.mode}
+              options={[
+                { value: 'edit', label: 'Edit' },
+                { value: 'redraw', label: 'Redraw' },
+              ]}
+              onChange={props.onMode}
+            />,
+          )}
         {explained(
           'brush',
           'Paint over a part to fill it or erase it',
