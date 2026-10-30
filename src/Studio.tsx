@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import type { ChatMessage, ModelCard } from '@hearthscale/app';
 import {
   Button,
@@ -172,15 +172,18 @@ async function complete(content: ChatMessage['content'], system: string | null):
 const CRAMPED = '(width < 900px)';
 const NARROW = '(width < 640px)';
 
+/** Whether the view is narrower than a media query's width, read again
+ *  whenever the frame resizes, also while the view first renders. */
 function useWidthBelow(query: string) {
-  const [below, setBelow] = useState(() => matchMedia(query).matches);
-  useEffect(() => {
-    const list = matchMedia(query);
-    const change = () => setBelow(list.matches);
-    list.addEventListener('change', change);
-    return () => list.removeEventListener('change', change);
-  }, [query]);
-  return below;
+  const subscribe = useCallback(
+    (notify: () => void) => {
+      const list = matchMedia(query);
+      list.addEventListener('change', notify);
+      return () => list.removeEventListener('change', notify);
+    },
+    [query],
+  );
+  return useSyncExternalStore(subscribe, () => matchMedia(query).matches);
 }
 
 export function Studio() {
