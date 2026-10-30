@@ -133,19 +133,27 @@ body {
   object-fit: cover;
 }
 
-.is-thumb,
-.is-strip-item {
+/* The hover and selected rings lie inside the picture, so no edge of a
+   scroller can cut them. */
+.is-thumb::after,
+.is-strip-item::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: inset 0 0 0 calc(var(--bw) * 2) transparent;
   transition: box-shadow var(--dur) var(--ease-out);
+  pointer-events: none;
 }
 
-.is-thumb:hover,
-.is-strip-item:not([data-making]):hover {
-  box-shadow: 0 0 0 calc(var(--bw) * 2) var(--cardb);
+.is-thumb:hover::after,
+.is-strip-item:not([data-making]):hover::after {
+  box-shadow: inset 0 0 0 calc(var(--bw) * 2) var(--cardb);
 }
 
-.is-thumb[data-on='true'],
-.is-strip-item[data-on='true'] {
-  box-shadow: 0 0 0 calc(var(--bw) * 2) var(--selection-ink);
+.is-thumb[data-on='true']::after,
+.is-strip-item[data-on='true']::after {
+  box-shadow: inset 0 0 0 calc(var(--bw) * 2) var(--selection-ink);
 }
 
 .is-thumb-mark {
@@ -313,6 +321,7 @@ body {
 }
 
 .is-strip-item {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
