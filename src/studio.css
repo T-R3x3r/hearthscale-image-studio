@@ -14,6 +14,10 @@ body {
 .is-studio {
   /* The height of the top bar, whose band the library's first row shares. */
   --studio-bar: calc(var(--space) * 9.5);
+  /* The column a page's content and the prompt share, and the inset beside
+     it: a page scroller's own inset and the scrollbar room it keeps. */
+  --studio-column: calc(var(--content-width) + var(--space) * 25.5);
+  --studio-side: calc(var(--space) * 7.25 + var(--scroll-size));
   position: relative;
   display: flex;
   height: 100%;
@@ -339,9 +343,9 @@ body {
   flex-direction: column;
   gap: var(--gap-stack);
   width: 100%;
-  max-width: calc(var(--content-width) + var(--space) * 40);
+  max-width: calc(var(--studio-column) + var(--studio-side) * 2);
   margin: 0 auto;
-  padding: 0 calc(var(--space) * 7.25) calc(var(--space) * 6);
+  padding: 0 var(--studio-side) calc(var(--space) * 6);
   box-sizing: border-box;
 }
 
@@ -414,6 +418,9 @@ body {
   display: flex;
   flex-direction: column;
   gap: var(--gap-stack);
+  width: 100%;
+  max-width: var(--studio-column);
+  margin: 0 auto;
 }
 
 .is-compare-pick {
@@ -510,6 +517,10 @@ body {
 }
 
 @media (width < 640px) {
+  .is-studio {
+    --studio-side: calc(var(--gap-row) + var(--scroll-size));
+  }
+
   .is-stage,
   .is-page {
     padding-right: var(--gap-row);
@@ -517,7 +528,7 @@ body {
   }
 
   .is-dock {
-    padding: 0 var(--gap-row) var(--gap-row);
+    padding-bottom: var(--gap-row);
   }
 
   .is-bar-slider,
