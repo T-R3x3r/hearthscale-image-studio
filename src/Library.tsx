@@ -94,7 +94,7 @@ export function Library(props: {
         </nav>
         <TextInput
           value={props.words}
-          placeholder="Search"
+          placeholder="Search pictures"
           aria-label="Search pictures"
           onChange={(e) => props.onWords(e.target.value)}
         />

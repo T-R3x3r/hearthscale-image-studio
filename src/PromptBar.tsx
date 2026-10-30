@@ -59,6 +59,8 @@ export function PromptBar(props: {
   onWords: (words: string) => void;
   onSubmit: () => void;
   action: string;
+  /** Words the prompt shows while it is empty, as an example for the action. */
+  example: string;
   ready: boolean;
   busy: boolean;
   source: Picture | null;
@@ -133,7 +135,7 @@ export function PromptBar(props: {
             className="hs-composer-editor is-words"
             rows={2}
             value={props.words}
-            placeholder={props.source ? 'Describe the change' : 'Describe a picture'}
+            placeholder={props.example}
             aria-label="Prompt"
             onChange={(e) => props.onWords(e.target.value)}
             onKeyDown={(e) => {
@@ -329,22 +331,28 @@ export function PromptBar(props: {
         <Popover anchor={advancedAt} placement="top-start" label="More settings" onDismiss={() => setAdvancedAt(null)}>
           <div className="is-advanced">
             {props.abilities.negative && (
-              <TextField label="Leave out" value={props.advanced.negative} onChange={set('negative')} data-autofocus />
+              <TextField
+                label="Things to leave out"
+                placeholder="Text, blur, extra fingers"
+                value={props.advanced.negative}
+                onChange={set('negative')}
+                data-autofocus
+              />
             )}
             {props.abilities.steps && (
               <TextField
                 label="Steps"
                 inputMode="numeric"
-                placeholder="Model's own"
+                placeholder="Automatic"
                 value={props.advanced.steps}
                 onChange={set('steps')}
               />
             )}
             {props.abilities.guidance && (
               <TextField
-                label="Follow the words"
+                label="Prompt strength"
                 inputMode="decimal"
-                placeholder="Model's own"
+                placeholder="Automatic"
                 value={props.advanced.guidance}
                 onChange={set('guidance')}
               />
@@ -353,7 +361,7 @@ export function PromptBar(props: {
               <TextField
                 label="Variation number"
                 inputMode="numeric"
-                placeholder="New each time"
+                placeholder="Random"
                 value={props.advanced.seed}
                 onChange={set('seed')}
               />

@@ -73,6 +73,17 @@ const LABELS: Record<Action | 'compare', string> = {
   compare: 'Compare',
 };
 
+/** What the prompt holds for each action, as an example of real words. */
+const EXAMPLES: Record<Exclude<Action, 'enlarge' | 'open'> | 'compare', string> = {
+  make: 'A red fox in a snowy forest at dawn',
+  compare: 'A red fox in a snowy forest at dawn',
+  change: 'Make it winter, with snow on the roofs',
+  edit: 'Make it winter, with snow on the roofs',
+  fill: 'A wooden bench',
+  erase: 'A wooden bench',
+  extend: 'More of the beach and the sky',
+};
+
 const IMPROVE =
   'You turn a short idea for a picture into one prompt for an image model. Name the subject, the setting, the light and the look in plain words. Answer with the prompt alone, in at most 60 words, with no quotes.';
 const DESCRIBE =
@@ -377,7 +388,7 @@ export function Studio() {
   const editing = !!source && page === 'studio';
   const extending = editing && currentTool === 'extend' && (sides.left || sides.right || sides.top || sides.bottom);
 
-  let action: Action | 'compare';
+  let action: keyof typeof EXAMPLES;
   if (page === 'compare') action = 'compare';
   else if (!editing) action = 'make';
   else if (extending) action = 'extend';
@@ -958,6 +969,7 @@ export function Studio() {
               onWords={setWords}
               onSubmit={() => void submit()}
               action={LABELS[action]}
+              example={EXAMPLES[action]}
               ready={ready}
               busy={starting}
               source={editing ? source : null}
