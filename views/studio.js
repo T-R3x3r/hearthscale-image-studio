@@ -404,7 +404,6 @@ body {
   flex-direction: column;
   gap: var(--gap-row);
   width: calc(var(--space) * 70);
-  padding: var(--pad-card);
 }
 
 /* Pages */
