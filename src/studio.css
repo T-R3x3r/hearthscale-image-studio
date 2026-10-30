@@ -200,7 +200,7 @@ body {
   flex: 1;
   flex-direction: column;
   min-height: 0;
-  padding: calc(var(--space) * 4.5) calc(var(--space) * 7.25);
+  padding: var(--studio-side);
 }
 
 .is-stage-area {
@@ -209,7 +209,10 @@ body {
   flex: 1 1 0;
   align-items: center;
   justify-content: center;
+  width: 100%;
+  max-width: var(--studio-column);
   min-height: 0;
+  margin: 0 auto;
   overflow: hidden;
 }
 
@@ -530,7 +533,6 @@ body {
     --studio-side: calc(var(--gap-row) + var(--scroll-size));
   }
 
-  .is-stage,
   .is-page {
     padding-right: var(--gap-row);
     padding-left: var(--gap-row);
