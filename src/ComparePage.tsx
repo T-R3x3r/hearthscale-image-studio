@@ -1,5 +1,5 @@
 import type { ModelCard } from '@hearthscale/app';
-import { Button, Chip, Icon, Meter, Notice, PageTitle } from '@hearthscale/app-ui';
+import { Button, Chip, Icon, Meter, Notice, PageTitle, StatusWord, useFloatingTips } from '@hearthscale/app-ui';
 import { assetUrl, fileUrl } from './bridge';
 import type { Picture, Run } from './records';
 import type { Live } from './runs';
@@ -28,13 +28,14 @@ export function ComparePage(props: {
   onUse: (card: string) => void;
   onCancel: (run: string) => void;
 }) {
+  const tips = useFloatingTips('top');
   const flip = (id: string) => {
     if (props.picked.includes(id)) props.onPick(props.picked.filter((p) => p !== id));
     else if (props.picked.length < COMPARE_MOST) props.onPick([...props.picked, id]);
   };
   return (
-    <div className="is-page">
-      <div className="is-page-body is-page-wide">
+    <div className="hs-scroll hs-settings-scroll is-page">
+      <main className="is-compare-page">
         <PageTitle>Compare models</PageTitle>
         {props.models.length < 2 ? (
           <Notice>Compare needs two image models or more on this computer.</Notice>
@@ -78,14 +79,24 @@ export function ComparePage(props: {
                         </Button>
                       </div>
                     ) : (
-                      <div className="is-compare-failed">
-                        {run.error ?? (run.status === 'cancelled' ? 'Cancelled' : 'No picture')}
-                      </div>
+                      (() => {
+                        const why = tips(run.id, run.error ?? undefined);
+                        return (
+                          <span {...why.hover} className="is-tipwrap">
+                            {run.status === 'cancelled' ? (
+                              <StatusWord tone="dim">Cancelled</StatusWord>
+                            ) : (
+                              <StatusWord tone="bad">Failed</StatusWord>
+                            )}
+                            {why.tip}
+                          </span>
+                        );
+                      })()
                     )}
                   </div>
                   {picture &&
                     (run.model === props.current ? (
-                      <Chip tone="ok">In use</Chip>
+                      <StatusWord tone="ok">In use</StatusWord>
                     ) : (
                       <Button
                         variant="secondary"
@@ -101,7 +112,7 @@ export function ComparePage(props: {
             </div>
           </>
         )}
-      </div>
+      </main>
     </div>
   );
 }

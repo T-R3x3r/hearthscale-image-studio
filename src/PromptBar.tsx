@@ -287,34 +287,35 @@ export function PromptBar(props: {
             />
           </div>
         )}
-        <span className="is-grow" />
-        {props.onDescribe && (
-          <span {...describe.hover} className="is-tipwrap">
-            <IconButton aria-label="Describe this picture" disabled={props.helping} onClick={props.onDescribe}>
-              <Icon name="eye-line" size={16} />
-            </IconButton>
-            {describe.tip}
-          </span>
-        )}
-        {props.onImprove && (
-          <span {...improve.hover} className="is-tipwrap">
-            <IconButton
-              aria-label="Improve my words"
-              disabled={props.helping || !props.words.trim()}
-              onClick={props.onImprove}
-            >
-              <Icon
-                name={props.helping ? 'loader-4-line' : 'magic-line'}
-                size={16}
-                className={props.helping ? 'hs-spin' : undefined}
-              />
-            </IconButton>
-            {improve.tip}
-          </span>
-        )}
-        <Button variant="primary" size="sm" disabled={!props.ready || props.busy} onClick={props.onSubmit}>
-          {props.action}
-        </Button>
+        <span className="is-prompt-end">
+          {props.onDescribe && (
+            <span {...describe.hover} className="is-tipwrap">
+              <IconButton aria-label="Describe this picture" disabled={props.helping} onClick={props.onDescribe}>
+                <Icon name="eye-line" size={16} />
+              </IconButton>
+              {describe.tip}
+            </span>
+          )}
+          {props.onImprove && (
+            <span {...improve.hover} className="is-tipwrap">
+              <IconButton
+                aria-label="Improve my words"
+                disabled={props.helping || !props.words.trim()}
+                onClick={props.onImprove}
+              >
+                <Icon
+                  name={props.helping ? 'loader-4-line' : 'magic-line'}
+                  size={16}
+                  className={props.helping ? 'hs-spin' : undefined}
+                />
+              </IconButton>
+              {improve.tip}
+            </span>
+          )}
+          <Button variant="primary" size="sm" disabled={!props.ready || props.busy} onClick={props.onSubmit}>
+            {props.action}
+          </Button>
+        </span>
       </div>
       {advancedAt && (
         <Popover anchor={advancedAt} placement="top-start" label="More settings" onDismiss={() => setAdvancedAt(null)}>

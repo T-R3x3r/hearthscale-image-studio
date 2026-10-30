@@ -59,14 +59,14 @@ export function Library(props: {
 }) {
   const rows = useMemo(() => rowsOf(props.pictures, props.locale), [props.pictures, props.locale]);
   return (
-    <div className="is-library">
+    <div className="hs-sidebar-column is-library">
       <div className="is-library-head">
         <Button variant="secondary" size="sm" fullWidth icon={<Icon name="add-line" size={14} />} onClick={props.onNew}>
           New picture
         </Button>
         <nav className="is-library-nav">
           <button
-            className="is-nav-row"
+            className="is-nav-row hs-hovbox-ink"
             data-on={props.page === 'studio' && !props.favourites}
             onClick={() => (props.onFavourites(false), props.onPage('studio'))}
           >
@@ -74,18 +74,26 @@ export function Library(props: {
             All pictures
           </button>
           <button
-            className="is-nav-row"
+            className="is-nav-row hs-hovbox-ink"
             data-on={props.page === 'studio' && props.favourites}
             onClick={() => (props.onFavourites(true), props.onPage('studio'))}
           >
             <Icon name="heart-line" size={16} />
             Favourites
           </button>
-          <button className="is-nav-row" data-on={props.page === 'compare'} onClick={() => props.onPage('compare')}>
+          <button
+            className="is-nav-row hs-hovbox-ink"
+            data-on={props.page === 'compare'}
+            onClick={() => props.onPage('compare')}
+          >
             <Icon name="layout-column-line" size={16} />
             Compare models
           </button>
-          <button className="is-nav-row" data-on={props.page === 'models'} onClick={() => props.onPage('models')}>
+          <button
+            className="is-nav-row hs-hovbox-ink"
+            data-on={props.page === 'models'}
+            onClick={() => props.onPage('models')}
+          >
             <Icon name="download-cloud-2-line" size={16} />
             Get models
           </button>
@@ -120,7 +128,7 @@ export function Library(props: {
                     key={picture.id}
                     className="is-thumb"
                     data-on={picture.id === props.shown}
-                    title={picture.prompt}
+                    aria-label={picture.prompt || 'Picture'}
                     onClick={() => props.onShow(picture)}
                   >
                     <img src={fileUrl(picture.path)} alt={picture.prompt} loading="lazy" decoding="async" />

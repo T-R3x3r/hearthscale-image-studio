@@ -11,15 +11,16 @@ import {
   Meter,
   PictureCompare,
   Slider,
+  StatusWord,
   anchorFrom,
   useFloatingTips,
   type MenuAnchor,
 } from '@hearthscale/app-ui';
-import { assetUrl, fileUrl } from './bridge';
+import { app, assetUrl, fileUrl } from './bridge';
 import type { Picture } from './records';
 import type { Live } from './runs';
 import { IDEAS } from './recipes';
-import type { Margins } from './pictures';
+import { paintStrokes, type Margins, type Stroke } from './pictures';
 
 export type Tool = 'none' | 'brush' | 'extend';
 
@@ -65,24 +66,38 @@ function useFit(area: RefObject<HTMLElement | null>, width: number, height: numb
   return box;
 }
 
-/** The strokes of the brush over the picture, kept at the picture's own size. */
+/** The strokes of the brush over the picture, kept at the picture's own size
+ *  and drawn again from the strokes whenever the canvas loses its pixels or
+ *  the theme changes its ink. */
 function Brush(props: {
-  strokes: RefObject<HTMLCanvasElement | null>;
+  strokes: Stroke[];
   width: number;
   height: number;
   size: number;
   erase: boolean;
   /** Whether the brush paints; the strokes stay in sight either way. */
   active: boolean;
-  onPaint: () => void;
+  onStroke: (stroke: Stroke) => void;
 }) {
-  const last = useRef<{ x: number; y: number } | null>(null);
+  const canvas = useRef<HTMLCanvasElement>(null);
+  const drawing = useRef<Stroke | null>(null);
+  const ink = () => getComputedStyle(canvas.current!).getPropertyValue('--accent').trim();
+
   useEffect(() => {
-    const canvas = props.strokes.current;
-    if (canvas && (canvas.width !== props.width || canvas.height !== props.height)) {
-      canvas.width = props.width;
-      canvas.height = props.height;
-    }
+    const element = canvas.current!;
+    const repaint = () => {
+      element.width = props.width;
+      element.height = props.height;
+      paintStrokes(element.getContext('2d')!, props.strokes, ink());
+    };
+    const later = () => requestAnimationFrame(repaint);
+    repaint();
+    element.addEventListener('contextrestored', repaint);
+    app.addEventListener('hostcontextchanged', later);
+    return () => {
+      element.removeEventListener('contextrestored', repaint);
+      app.removeEventListener('hostcontextchanged', later);
+    };
   }, [props.strokes, props.width, props.height]);
 
   const at = (event: PointerEvent<HTMLCanvasElement>) => {
@@ -93,43 +108,41 @@ function Brush(props: {
       scale: props.width / rect.width,
     };
   };
-  const paint = (event: PointerEvent<HTMLCanvasElement>) => {
-    const canvas = props.strokes.current;
-    if (!canvas) return;
-    const context = canvas.getContext('2d')!;
-    const point = at(event);
-    const from = last.current ?? point;
-    context.globalCompositeOperation = props.erase ? 'destination-out' : 'source-over';
-    context.strokeStyle = getComputedStyle(canvas).getPropertyValue('--accent').trim();
-    context.lineCap = 'round';
-    context.lineJoin = 'round';
-    context.lineWidth = props.size * point.scale;
-    context.beginPath();
-    context.moveTo(from.x, from.y);
-    context.lineTo(point.x, point.y);
-    context.stroke();
-    last.current = point;
-    if (!props.erase) props.onPaint();
+  const extend = (event: PointerEvent<HTMLCanvasElement>) => {
+    const stroke = drawing.current;
+    if (!stroke) return;
+    const { x, y } = at(event);
+    const last = stroke.points[stroke.points.length - 1];
+    stroke.points.push({ x, y });
+    paintStrokes(canvas.current!.getContext('2d')!, [{ ...stroke, points: [last, { x, y }] }], ink());
+  };
+  const finish = () => {
+    if (drawing.current) props.onStroke(drawing.current);
+    drawing.current = null;
   };
   return (
     <canvas
-      ref={props.strokes}
+      ref={canvas}
       className="is-strokes"
       data-active={props.active}
       onPointerDown={(event) => {
         event.currentTarget.setPointerCapture(event.pointerId);
-        last.current = null;
-        paint(event);
+        const { x, y, scale } = at(event);
+        drawing.current = { size: props.size * scale, erase: props.erase, points: [{ x, y }] };
+        paintStrokes(canvas.current!.getContext('2d')!, [drawing.current], ink());
       }}
       onPointerMove={(event) => {
-        if (event.buttons === 1) paint(event);
+        if (event.buttons === 1) extend(event);
       }}
-      onPointerUp={() => (last.current = null)}
+      onPointerUp={finish}
+      onPointerCancel={finish}
     />
   );
 }
 
 export function Stage(props: {
+  /** Whether the bar keeps only its main actions and puts the rest in the More menu. */
+  narrow: boolean;
   picture: Picture | null;
   size: { width: number; height: number } | null;
   source: Picture | null;
@@ -143,13 +156,13 @@ export function Stage(props: {
   onIdea: (words: string) => void;
   tool: Tool;
   onTool: (tool: Tool) => void;
-  strokes: RefObject<HTMLCanvasElement | null>;
+  strokes: Stroke[];
   brushSize: number;
   onBrushSize: (size: number) => void;
   erasing: boolean;
   onErasing: (on: boolean) => void;
   painted: boolean;
-  onPaint: () => void;
+  onStroke: (stroke: Stroke) => void;
   onClearStrokes: () => void;
   sides: Sides;
   onSides: (sides: Sides) => void;
@@ -168,6 +181,7 @@ export function Stage(props: {
       ? { width: size.width + margins.left + margins.right, height: size.height + margins.top + margins.bottom }
       : size;
   const box = useFit(area, framed?.width ?? 0, framed?.height ?? 0);
+  const waiting = tips('waiting', props.live?.waiting ?? undefined);
 
   let body;
   if (props.comparing && picture && props.sourceOf) {
@@ -210,7 +224,7 @@ export function Stage(props: {
             size={props.brushSize}
             erase={props.erasing}
             active={props.tool === 'brush'}
-            onPaint={props.onPaint}
+            onStroke={props.onStroke}
           />
         )}
       </div>
@@ -224,7 +238,14 @@ export function Stage(props: {
           <Icon name="image-ai-line" size={40} className="is-making-mark" />
         )}
         <div className="is-making-state">
-          <span>{props.live.waiting ? 'Waiting' : props.liveLabel}</span>
+          {props.live.waiting ? (
+            <span {...waiting.hover} className="is-tipwrap">
+              <StatusWord tone="info">Waiting</StatusWord>
+              {waiting.tip}
+            </span>
+          ) : (
+            <span>{props.liveLabel}</span>
+          )}
           <Meter value={props.live.fraction} label="How far the picture is" />
         </div>
       </div>
@@ -349,7 +370,7 @@ export function Stage(props: {
             Edit this
           </Button>
         )}
-        {actions.vary && (
+        {actions.vary && !props.narrow && (
           <Button
             variant="secondary"
             size="sm"
@@ -360,26 +381,30 @@ export function Stage(props: {
             Vary
           </Button>
         )}
-        {actions.bigger && (
+        {actions.bigger && !props.narrow && (
           <Button variant="secondary" size="sm" icon={<Icon name="zoom-in-line" size={14} />} onClick={actions.bigger}>
             Bigger
           </Button>
         )}
         <span {...favourite.hover} className="is-tipwrap">
           <IconButton
+            className="is-toggle"
             aria-label={picture.favourite ? 'Remove from favourites' : 'Add to favourites'}
+            aria-pressed={picture.favourite}
             onClick={actions.favourite}
           >
-            <Icon name={picture.favourite ? 'heart-fill' : 'heart-line'} size={16} />
+            <Icon name="heart-line" size={16} />
           </IconButton>
           {favourite.tip}
         </span>
-        <span {...save.hover} className="is-tipwrap">
-          <IconButton aria-label="Save as" onClick={actions.save}>
-            <Icon name="download-2-line" size={16} />
-          </IconButton>
-          {save.tip}
-        </span>
+        {!props.narrow && (
+          <span {...save.hover} className="is-tipwrap">
+            <IconButton aria-label="Save as" onClick={actions.save}>
+              <Icon name="download-2-line" size={16} />
+            </IconButton>
+            {save.tip}
+          </span>
+        )}
         <span {...more.hover} className="is-tipwrap">
           <IconButton aria-label="More" onClick={(e) => setMenu(anchorFrom('more', e))}>
             <Icon name="more-line" size={16} />
@@ -404,6 +429,34 @@ export function Stage(props: {
       )}
       {menu && actions && (
         <MenuSurface anchor={menu} dir="up" onDismiss={() => setMenu(null)}>
+          {props.narrow && actions.vary && (
+            <>
+              <MItem
+                icon={<Icon name="shuffle-line" size={14} />}
+                label="Vary a little"
+                onClick={() => (setMenu(null), actions.vary!('little'))}
+              />
+              <MItem
+                icon={<Icon name="shuffle-line" size={14} />}
+                label="Vary a lot"
+                onClick={() => (setMenu(null), actions.vary!('lot'))}
+              />
+            </>
+          )}
+          {props.narrow && actions.bigger && (
+            <MItem
+              icon={<Icon name="zoom-in-line" size={14} />}
+              label="Bigger"
+              onClick={() => (setMenu(null), actions.bigger!())}
+            />
+          )}
+          {props.narrow && (
+            <MItem
+              icon={<Icon name="download-2-line" size={14} />}
+              label="Save as"
+              onClick={() => (setMenu(null), actions.save())}
+            />
+          )}
           {actions.addToPrompt && (
             <MItem
               icon={<Icon name="image-add-line" size={14} />}

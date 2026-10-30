@@ -69,14 +69,39 @@ export async function prepared(file: Blob): Promise<Blob> {
   }
 }
 
+/** One drag of the brush, in the picture's own pixels. */
+export interface Stroke {
+  size: number;
+  erase: boolean;
+  points: { x: number; y: number }[];
+}
+
+/** Draws strokes in one ink onto a context the size of their picture; a
+ *  stroke that rubs out clears what the strokes before it drew. */
+export function paintStrokes(context: CanvasRenderingContext2D, strokes: Stroke[], ink: string): void {
+  context.lineCap = 'round';
+  context.lineJoin = 'round';
+  context.strokeStyle = ink;
+  for (const stroke of strokes) {
+    const [first, ...rest] = stroke.points;
+    context.globalCompositeOperation = stroke.erase ? 'destination-out' : 'source-over';
+    context.lineWidth = stroke.size;
+    context.beginPath();
+    context.moveTo(first.x, first.y);
+    for (const point of rest.length ? rest : [first]) context.lineTo(point.x, point.y);
+    context.stroke();
+  }
+  context.globalCompositeOperation = 'source-over';
+}
+
 /** A mask a job takes from the strokes of the brush: white where the
  *  strokes cover the picture, black elsewhere. */
-export async function maskOf(strokes: HTMLCanvasElement): Promise<Blob> {
+export async function maskOf(strokes: Stroke[], width: number, height: number): Promise<Blob> {
   const canvas = document.createElement('canvas');
-  canvas.width = strokes.width;
-  canvas.height = strokes.height;
+  canvas.width = width;
+  canvas.height = height;
   const context = canvas.getContext('2d')!;
-  context.drawImage(strokes, 0, 0);
+  paintStrokes(context, strokes, 'white');
   const pixels = context.getImageData(0, 0, canvas.width, canvas.height);
   for (let i = 0; i < pixels.data.length; i += 4) {
     const on = pixels.data[i + 3] > 0 ? 255 : 0;

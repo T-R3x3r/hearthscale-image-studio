@@ -29,7 +29,7 @@ import {
   type Run,
 } from './records';
 import { abilitiesOf, onDownload, readModels, type Abilities, type Models } from './models';
-import { blobOf, extended, fileName, marginsOf, maskOf, prepared, sizeOf, upload } from './pictures';
+import { blobOf, extended, fileName, marginsOf, maskOf, prepared, sizeOf, upload, type Stroke } from './pictures';
 import {
   dimensions,
   ERASE_WORDS,
@@ -168,11 +168,28 @@ async function complete(content: ChatMessage['content'], system: string | null):
     .replace(/^["']|["']$/g, '');
 }
 
+/** The widths below which the library lies over the stage, and the bars keep only their main actions. */
+const CRAMPED = '(width < 900px)';
+const NARROW = '(width < 640px)';
+
+function useWidthBelow(query: string) {
+  const [below, setBelow] = useState(() => matchMedia(query).matches);
+  useEffect(() => {
+    const list = matchMedia(query);
+    const change = () => setBelow(list.matches);
+    list.addEventListener('change', change);
+    return () => list.removeEventListener('change', change);
+  }, [query]);
+  return below;
+}
+
 export function Studio() {
   const [models, setModels] = useState<Models | null>(null);
   const [prefs, setPrefsState] = useState<Prefs>(PREFS);
   const [page, setPage] = useState<Page>('studio');
-  const [folded, setFolded] = useState(false);
+  const cramped = useWidthBelow(CRAMPED);
+  const narrow = useWidthBelow(NARROW);
+  const [folded, setFolded] = useState(cramped);
   const [pictures, setPictures] = useState<Picture[]>([]);
   const [search, setSearch] = useState('');
   const [favourites, setFavourites] = useState(false);
@@ -190,8 +207,8 @@ export function Studio() {
   const [mode, setMode] = useState<Mode>('edit');
   const [amount, setAmount] = useState(0.75);
   const [currentTool, setTool] = useState<Tool>('none');
-  const strokes = useRef<HTMLCanvasElement>(null);
-  const [painted, setPainted] = useState(false);
+  const [strokes, setStrokes] = useState<Stroke[]>([]);
+  const painted = strokes.some((stroke) => !stroke.erase);
   const [brushSize, setBrushSize] = useState(48);
   const [erasing, setErasing] = useState(false);
   const [sides, setSides] = useState<Sides>({ left: false, right: true, top: false, bottom: false, share: 0.25 });
@@ -265,6 +282,8 @@ export function Studio() {
     void refreshLibrary();
   }, [refreshLibrary]);
 
+  useEffect(() => setFolded(cramped), [cramped]);
+
   useEffect(
     () =>
       onEnded(async (id, outcome, error) => {
@@ -326,7 +345,7 @@ export function Studio() {
   useEffect(() => {
     setSourceSize(null);
     setTool('none');
-    setPainted(false);
+    setStrokes([]);
     if (!source) return;
     void sizeOf(source.path).then(setSourceSize);
   }, [source]);
@@ -453,7 +472,7 @@ export function Studio() {
         input = { prompt: styled.prompt, image: inputs[0], strength };
       } else if (kind === 'fill' || kind === 'erase') {
         inputs.push(...(await hold([from.path])));
-        inputs.push(await upload('mask.png', await maskOf(strokes.current!)));
+        inputs.push(await upload('mask.png', await maskOf(strokes, sourceSize!.width, sourceSize!.height)));
         input = {
           prompt: kind === 'erase' ? ERASE_WORDS : styled.prompt,
           image: inputs[0],
@@ -498,7 +517,7 @@ export function Studio() {
     await begin(run, { ...input, ...sized(abilities, width, height), ...settings.input });
     if (kind === 'fill' || kind === 'erase' || kind === 'extend') {
       setTool('none');
-      setPainted(false);
+      setStrokes([]);
     }
   }
 
@@ -751,11 +770,13 @@ export function Studio() {
   const columns: Column[] = compareRuns.map(({ run, picture }) => ({ run, picture, live: live.get(run.id) ?? null }));
   const fold = tips('fold', folded ? 'Show the library' : 'Hide the library');
   const lightboxItems = strip.length ? strip : shown ? [shown] : [];
+  const away = () => {
+    if (cramped) setFolded(true);
+  };
 
   return (
     <div
       className="is-studio"
-      data-folded={folded}
       onDragOver={(e) => e.preventDefault()}
       onDrop={(e) => {
         e.preventDefault();
@@ -774,8 +795,9 @@ export function Studio() {
             page={page}
             onWords={setSearch}
             onFavourites={setFavourites}
-            onShow={(picture) => (setPage('studio'), void show(picture))}
+            onShow={(picture) => (away(), setPage('studio'), void show(picture))}
             onNew={() => {
+              away();
               setPage('studio');
               setSource(null);
               setReferences([]);
@@ -784,20 +806,26 @@ export function Studio() {
               setStripRun(null);
               setStrip([]);
             }}
-            onPage={setPage}
+            onPage={(next) => (away(), setPage(next))}
           />
         </aside>
       )}
       <main className="is-main">
-        <span {...fold.hover} className="is-fold is-tipwrap">
-          <IconButton aria-label={folded ? 'Show the library' : 'Hide the library'} onClick={() => setFolded(!folded)}>
-            <Icon name={folded ? 'side-wide' : 'side-narrow'} size={16} />
-          </IconButton>
-          {fold.tip}
-        </span>
+        <div className="is-toolbar">
+          <span {...fold.hover} className="is-tipwrap">
+            <IconButton
+              aria-label={folded ? 'Show the library' : 'Hide the library'}
+              onClick={() => setFolded(!folded)}
+            >
+              <Icon name={folded ? 'side-wide' : 'side-narrow'} size={16} />
+            </IconButton>
+            {fold.tip}
+          </span>
+        </div>
         {page === 'studio' && (
           <>
             <Stage
+              narrow={narrow}
               picture={stagePicture}
               size={stageSize}
               source={source}
@@ -824,12 +852,8 @@ export function Studio() {
               erasing={erasing}
               onErasing={setErasing}
               painted={painted}
-              onPaint={() => setPainted(true)}
-              onClearStrokes={() => {
-                const canvas = strokes.current;
-                canvas?.getContext('2d')?.clearRect(0, 0, canvas.width, canvas.height);
-                setPainted(false);
-              }}
+              onStroke={(stroke) => setStrokes((before) => [...before, stroke])}
+              onClearStrokes={() => setStrokes([])}
               sides={sides}
               onSides={setSides}
               margins={margins}
