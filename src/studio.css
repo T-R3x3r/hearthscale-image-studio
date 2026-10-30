@@ -344,10 +344,6 @@ body {
   font-size: var(--fs-row);
 }
 
-.is-making-state .hs-meter {
-  align-self: stretch;
-}
-
 .is-ideas {
   display: flex;
   flex-wrap: wrap;

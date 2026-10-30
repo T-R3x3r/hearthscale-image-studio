@@ -8,7 +8,6 @@ import {
   MDivider,
   MItem,
   MenuSurface,
-  Meter,
   PictureCompare,
   Popover,
   SegmentedControl,
@@ -225,7 +224,10 @@ export interface StageProps {
   comparing: boolean;
   onStopCompare: () => void;
   live: Live | null;
+  /** The task in progress, such as "Making…". */
   liveLabel: string;
+  /** The model the task runs on, which the label's tooltip names. */
+  liveModel: string;
   noModel: boolean;
   /** Why no image model can run, where no Server offers one to install. */
   unavailable: string | null;
@@ -266,6 +268,7 @@ export function Stage(props: StageProps) {
       : size;
   const box = useFit(area, framed?.width ?? 0, framed?.height ?? 0);
   const waiting = tips('waiting', props.live?.waiting ?? undefined);
+  const runsOn = tips('model', props.liveModel ? `With ${props.liveModel}` : undefined);
 
   let body;
   if (props.comparing && picture && props.sourceOf) {
@@ -331,9 +334,11 @@ export function Stage(props: StageProps) {
               {waiting.tip}
             </span>
           ) : (
-            <span>{props.liveLabel}</span>
+            <span {...runsOn.hover} className="is-tipwrap">
+              {props.liveLabel}
+              {runsOn.tip}
+            </span>
           )}
-          <Meter value={props.live.fraction} label="Progress" />
         </div>
       </div>
     );

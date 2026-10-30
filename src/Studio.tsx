@@ -459,7 +459,7 @@ export function Studio() {
     setStripRun(run);
     setStrip([]);
     shownBefore.current = shown;
-    setShown(null);
+    if (run.action !== 'enlarge') setShown(null);
     setComparing(false);
     await startRun(run, input, LABELS[run.action]);
   }
@@ -854,9 +854,8 @@ export function Studio() {
     comparing,
     onStopCompare: () => setComparing(false),
     live: stripLive,
-    liveLabel: stripRun
-      ? `${stripRun.action === 'make' ? 'Making' : stripRun.action === 'enlarge' ? 'Enlarging' : 'Changing'} with ${stripRun.label}…`
-      : '',
+    liveLabel: stripRun ? `${stripRun.action === 'make' ? 'Making' : 'Changing'}…` : '',
+    liveModel: stripRun?.label ?? '',
     noModel: !!models && imageCards.length === 0,
     unavailable: models?.unavailable ?? null,
     onRetry: () => void refreshModels(),
