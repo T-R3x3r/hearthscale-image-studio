@@ -373,7 +373,7 @@ export function StageBar(props: StageProps) {
           'brush',
           'Paint over a part to fill it or erase it',
           <Button
-            variant="secondary"
+            variant="ghost"
             size="sm"
             icon={<Icon name="paint-brush-line" size={14} />}
             onClick={() => props.onTool('brush')}
@@ -385,7 +385,7 @@ export function StageBar(props: StageProps) {
           'extend',
           'Grow the picture past its edges',
           <Button
-            variant="secondary"
+            variant="ghost"
             size="sm"
             icon={<Icon name="expand-diagonal-line" size={14} />}
             onClick={() => props.onTool('extend')}
@@ -405,7 +405,7 @@ export function StageBar(props: StageProps) {
     bar = (
       <>
         {actions.edit && (
-          <Button variant="secondary" size="sm" icon={<Icon name="image-edit-line" size={14} />} onClick={actions.edit}>
+          <Button variant="ghost" size="sm" icon={<Icon name="image-edit-line" size={14} />} onClick={actions.edit}>
             Edit this
           </Button>
         )}
@@ -415,7 +415,7 @@ export function StageBar(props: StageProps) {
             'vary',
             'New pictures close to this one',
             <Button
-              variant="secondary"
+              variant="ghost"
               size="sm"
               icon={<Icon name="shuffle-line" size={14} />}
               trailingIcon={<Icon name="arrow-down-s-line" size={14} />}
@@ -429,12 +429,7 @@ export function StageBar(props: StageProps) {
           explained(
             'enlarge',
             'A larger, sharper copy',
-            <Button
-              variant="secondary"
-              size="sm"
-              icon={<Icon name="zoom-in-line" size={14} />}
-              onClick={actions.enlarge}
-            >
+            <Button variant="ghost" size="sm" icon={<Icon name="zoom-in-line" size={14} />} onClick={actions.enlarge}>
               Enlarge
             </Button>,
           )}
