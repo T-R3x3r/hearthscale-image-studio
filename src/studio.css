@@ -130,6 +130,16 @@ body {
   object-fit: cover;
 }
 
+.is-thumb,
+.is-strip-item {
+  transition: box-shadow var(--dur) var(--ease-out);
+}
+
+.is-thumb:hover,
+.is-strip-item:not([data-making]):hover {
+  box-shadow: 0 0 0 calc(var(--bw) * 2) var(--cardb);
+}
+
 .is-thumb[data-on='true'],
 .is-strip-item[data-on='true'] {
   box-shadow: 0 0 0 calc(var(--bw) * 2) var(--selection-ink);
