@@ -641,7 +641,6 @@ body {
     --studio-inset: var(--gap-row);
   }
 
-  .is-bar-slider,
   .is-amount {
     width: calc(var(--space) * 30);
   }

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type RefObject } from 'react';
 import type { ChatMessage, ModelCard } from '@hearthscale/app';
 import { Button, Icon, IconButton, Lightbox, Meter, ShellConfirm, Toast, useFloatingTips } from '@hearthscale/app-ui';
 import { call, download, fileUrl, hostContext, on, reason, tool } from './bridge';
@@ -192,6 +192,24 @@ async function complete(content: ChatMessage['content'], system: string | null):
 /** The widths below which the library lies over the stage, and the bars keep only their main actions. */
 const CRAMPED = '(width < 900px)';
 const NARROW = '(width < 640px)';
+/** The main area's width, in CSS pixels, under which the tools' bars put
+ *  their sides and sliders behind presses: the widest bar, Brush with
+ *  Amount, then still leaves the picture's name room. */
+const ROOMY = 1040;
+
+/** An element's width in CSS pixels, read again whenever it resizes. */
+function useWidth(element: RefObject<HTMLElement | null>) {
+  const [width, setWidth] = useState(0);
+  useLayoutEffect(() => {
+    const node = element.current!;
+    const read = () => setWidth(node.clientWidth);
+    read();
+    const observer = new ResizeObserver(read);
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [element]);
+  return width;
+}
 
 /** Whether the view is narrower than a media query's width, read again
  *  whenever the frame resizes, also while the view first renders. */
@@ -213,6 +231,8 @@ export function Studio() {
   const [page, setPage] = useState<Page>('studio');
   const cramped = useWidthBelow(CRAMPED);
   const narrow = useWidthBelow(NARROW);
+  const main = useRef<HTMLElement>(null);
+  const mainWidth = useWidth(main);
   const [folded, setFolded] = useState(cramped);
   const [pictures, setPictures] = useState<Picture[]>([]);
   const [search, setSearch] = useState('');
@@ -852,7 +872,7 @@ export function Studio() {
   const suggestedImage = models?.downloading.find((card) => card.kind === 'image') ?? models?.absentImage[0] ?? null;
   const stageProps: StageProps = {
     narrow,
-    compact: cramped,
+    compact: mainWidth < ROOMY,
     mode,
     onMode: setMode,
     showMode:
@@ -952,7 +972,7 @@ export function Studio() {
           />
         </aside>
       )}
-      <main className="is-main">
+      <main className="is-main" ref={main}>
         <div className="is-toolbar">
           <span {...fold.hover} className="is-tipwrap">
             <IconButton
