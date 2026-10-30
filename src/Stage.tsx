@@ -82,7 +82,7 @@ function Brush(props: {
 }) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const drawing = useRef<Stroke | null>(null);
-  const ink = () => getComputedStyle(canvas.current!).getPropertyValue('--accent').trim();
+  const ink = () => getComputedStyle(canvas.current!).getPropertyValue('--selection-ink').trim();
 
   useEffect(() => {
     const element = canvas.current!;
@@ -358,7 +358,7 @@ export function StageBar(props: StageProps) {
           'eraser',
           'Rub out brush strokes',
           <BarToggle on={props.erasing} onClick={() => props.onErasing(!props.erasing)}>
-            Eraser
+            Rub out
           </BarToggle>,
         )}
         <Button variant="ghost" size="sm" onClick={props.onClearStrokes}>
