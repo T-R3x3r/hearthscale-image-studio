@@ -110,7 +110,7 @@ body {
 }
 
 .is-day {
-  padding: calc(var(--space) * 3) calc(var(--space) * 2.5) var(--space);
+  padding: calc(var(--space) * 3) calc(var(--space) * 2.5) var(--gap-inline);
   color: var(--dim);
   font-size: var(--fs-cap);
 }
@@ -118,8 +118,8 @@ body {
 .is-thumbs {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--space);
-  padding-bottom: var(--space);
+  gap: var(--gap-inline);
+  padding: 0 calc(var(--space) * 2.5) var(--gap-inline);
 }
 
 .is-thumb {
