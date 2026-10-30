@@ -99,7 +99,7 @@ body {
 }
 
 .is-library-empty {
-  padding: var(--gap-stack) calc(var(--space) * 2.5);
+  padding: var(--gap-row) calc(var(--space) * 2.5) 0;
   color: var(--mut);
   font-size: var(--fs-row);
 }

@@ -105,7 +105,7 @@ export function Library(props: {
       </div>
       {rows.length === 0 ? (
         <div className="is-library-empty">
-          {props.words || props.favourites ? 'No pictures match' : 'No pictures yet'}
+          {props.words ? 'No pictures match' : props.favourites ? 'No favourites yet' : 'No pictures yet'}
         </div>
       ) : (
         <VirtualList
