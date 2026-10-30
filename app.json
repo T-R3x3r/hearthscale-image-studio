@@ -17,6 +17,40 @@
     "chat": { "required": false }
   },
   "permissions": ["clipboard-write"],
+  "onboarding": {
+    "version": 1,
+    "cards": [
+      {
+        "title": "Pictures from a few words.",
+        "text": "Image Studio makes and changes pictures with the image models on this computer, and keeps every one in its library."
+      },
+      {
+        "title": "Make a picture, then change it.",
+        "rows": [
+          { "icon": "image", "title": "Make", "text": "Write what you want to see, then choose Make." },
+          { "icon": "pen", "title": "Edit by words", "text": "Say what to change, such as the season or the light." },
+          { "icon": "click", "title": "Fill and erase", "text": "Brush over a part to put something new there, or to take it out." },
+          { "icon": "view", "title": "Extend", "text": "Grow the picture past its edges, on the sides you pick." }
+        ]
+      },
+      {
+        "title": "Make it larger, or try another model.",
+        "rows": [
+          { "icon": "search", "title": "Enlarge", "text": "Make a larger, sharper copy of a picture." },
+          { "icon": "eye", "title": "Compare", "text": "Make the same picture with two or more models, side by side." },
+          { "icon": "brain", "title": "Models", "text": "Image models run on this computer, not online." }
+        ]
+      },
+      {
+        "title": "Good for everyday pictures.",
+        "rows": [
+          { "icon": "image", "title": "Cards and posters", "text": "A watercolour fox for a birthday card." },
+          { "icon": "click", "title": "Holiday photos", "text": "A stranger erased from the beach." },
+          { "icon": "view", "title": "Desktop pictures", "text": "A portrait extended into a wide view." }
+        ]
+      }
+    ]
+  },
   "surfaces": [
     {
       "id": "studio",
