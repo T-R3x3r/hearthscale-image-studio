@@ -38,10 +38,12 @@ body {
   display: inline-flex;
 }
 
+/* Where the footer wraps, its end keeps to the right of its row. */
 .is-prompt-end {
   display: flex;
   align-items: center;
   gap: var(--space);
+  margin-left: auto;
 }
 
 /* The model slot: the footer's free room, as high as the footer's other
@@ -586,11 +588,6 @@ body {
 }
 
 @media (width < 640px) {
-  /* The footer wraps in a narrow tile; its end keeps to the right. */
-  .is-prompt-end {
-    margin-left: auto;
-  }
-
   .is-studio {
     --studio-inset: var(--gap-row);
   }
