@@ -111,6 +111,7 @@ body {
   padding: var(--gap-row) calc(var(--space) * 2.5) var(--gap-inline);
   color: var(--dim);
   font-size: var(--fs-cap);
+  line-height: calc(var(--space) * 4);
 }
 
 .is-thumbs {
