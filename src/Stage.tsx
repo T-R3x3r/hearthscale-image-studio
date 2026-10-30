@@ -153,7 +153,9 @@ export interface StageProps {
   live: Live | null;
   liveLabel: string;
   noModel: boolean;
-  onGetModels: () => void;
+  /** The image model the Server suggests when none is there, or the one it downloads. */
+  suggestion: { label: string; downloading: boolean } | null;
+  onInstall: () => void;
   onIdea: (words: string) => void;
   tool: Tool;
   onTool: (tool: Tool) => void;
@@ -252,11 +254,15 @@ export function Stage(props: StageProps) {
       </div>
     );
   } else if (props.noModel) {
-    body = (
+    body = props.suggestion?.downloading ? (
+      <EmptyState icon={<Icon name="image-ai-line" size={30} />} title={`Downloading ${props.suggestion.label}…`} />
+    ) : (
       <EmptyState icon={<Icon name="image-ai-line" size={30} />} title="No image model">
-        <Button variant="secondary" icon={<Icon name="download-cloud-2-line" size={14} />} onClick={props.onGetModels}>
-          Get models
-        </Button>
+        {props.suggestion && (
+          <Button variant="secondary" icon={<Icon name="download-2-line" size={14} />} onClick={props.onInstall}>
+            Install {props.suggestion.label}
+          </Button>
+        )}
       </EmptyState>
     );
   } else {

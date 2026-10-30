@@ -73,7 +73,6 @@ export function PromptBar(props: {
   model: ModelCard | null;
   abilities: Abilities;
   onModel: (id: string) => void;
-  onGetModels: () => void;
   shape: ShapeId;
   onShape: (shape: ShapeId) => void;
   size: SizeId;
@@ -196,12 +195,6 @@ export function PromptBar(props: {
                       onClick={() => (close(), props.onModel(card.id))}
                     />
                   ))}
-                  {props.models.length > 0 && <MDivider />}
-                  <MItem
-                    icon={<Icon name="download-cloud-2-line" size={14} />}
-                    label="Get more models"
-                    onClick={() => (close(), props.onGetModels())}
-                  />
                 </>
               )}
             </Menu>

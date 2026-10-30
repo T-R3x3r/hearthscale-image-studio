@@ -54,12 +54,12 @@ export function Library(props: {
   shown: string | null;
   words: string;
   favourites: boolean;
-  page: 'studio' | 'compare' | 'models';
+  page: 'studio' | 'compare';
   onWords: (words: string) => void;
   onFavourites: (on: boolean) => void;
   onShow: (picture: Picture) => void;
   onNew: () => void;
-  onPage: (page: 'studio' | 'compare' | 'models') => void;
+  onPage: (page: 'studio' | 'compare') => void;
 }) {
   const rows = useMemo(() => rowsOf(props.pictures, props.locale), [props.pictures, props.locale]);
   return (
@@ -94,10 +94,6 @@ export function Library(props: {
           <button className={navRow(props.page === 'compare')} onClick={() => props.onPage('compare')}>
             <Icon name="layout-column-line" size={16} />
             Compare models
-          </button>
-          <button className={navRow(props.page === 'models')} onClick={() => props.onPage('models')}>
-            <Icon name="download-cloud-2-line" size={16} />
-            Get models
           </button>
         </nav>
         <TextInput

@@ -37,12 +37,6 @@ body {
   margin-left: auto;
 }
 
-.is-size {
-  color: var(--mut);
-  font-size: var(--fs-sm);
-  white-space: nowrap;
-}
-
 /* The library */
 
 .is-side {
@@ -420,19 +414,6 @@ body {
 }
 
 /* Pages */
-
-.is-model-meter {
-  width: calc(var(--space) * 40);
-}
-
-.is-model-search {
-  display: flex;
-  gap: var(--gap-stack);
-}
-
-.is-model-search > :first-child {
-  flex: 1;
-}
 
 .is-compare-page {
   display: flex;

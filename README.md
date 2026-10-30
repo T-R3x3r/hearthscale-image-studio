@@ -17,8 +17,6 @@ with it, and keeps every picture in its library.
   background**.
 - **Enlarge** a picture into a larger, sharper copy.
 - **Compare** two to four models on the same words and see which you like.
-- **Get models**: install the models your Server suggests, or search Hugging
-  Face for any image model your Server can run.
 - Keep your favourites, search your library, save a picture where you like or
   copy it.
 
@@ -26,8 +24,8 @@ Your pictures stay on your computer, in Image Studio's own folder.
 
 ## What it needs
 
-An image model on a Hearthscale Server. Image Studio asks you before it
-installs one. A chat model is optional: it improves your words and describes
+An image model on a Hearthscale Server. When there is none, Image Studio
+offers the one your Server suggests, and the Server downloads it. A chat model is optional: it improves your words and describes
 a picture for you.
 
 Image Studio is free.

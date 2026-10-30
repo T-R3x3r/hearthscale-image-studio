@@ -46,9 +46,8 @@ import { Library } from './Library';
 import { Stage, StageBar, type PictureActions, type Sides, type StageProps, type Tool } from './Stage';
 import { PromptBar, type Advanced, type Mode } from './PromptBar';
 import { ComparePage, type Column } from './ComparePage';
-import { ModelsPage, type Downloads } from './ModelsPage';
 
-type Page = 'studio' | 'compare' | 'models';
+type Page = 'studio' | 'compare';
 
 interface Prefs {
   model: string | null;
@@ -228,7 +227,6 @@ export function Studio() {
   const [sides, setSides] = useState<Sides>({ left: false, right: true, top: false, bottom: false, share: 0.25 });
   const [compareSet, setCompareSet] = useState<string | null>(null);
   const [compareRuns, setCompareRuns] = useState<{ run: Run; picture: Picture | null }[]>([]);
-  const [downloads, setDownloads] = useState<Downloads>(new Map());
   const [problem, setProblem] = useState<string | null>(null);
   const [toast, setToast] = useState<{ text: string; undo?: () => void } | null>(null);
   const [large, setLarge] = useState<number | null>(null);
@@ -318,12 +316,6 @@ export function Studio() {
   useEffect(
     () =>
       onDownload((moved) => {
-        setDownloads((before) => {
-          const next = new Map(before);
-          if (moved.state === 'downloading' && moved.progress) next.set(moved.card, moved.progress);
-          else next.delete(moved.card);
-          return next;
-        });
         if (moved.state !== 'downloading') {
           if (moved.state !== 'ready' && moved.reason) setProblem(moved.reason);
           void refreshModels();
@@ -599,8 +591,14 @@ export function Studio() {
     await begin(next, { prompt: styled.prompt, ...sizes, ...settings.input });
   }
 
+  /** Starts the Server's download of a model the app needs, with Hearthscale's install card. */
+  async function install(card: ModelCard) {
+    await call('hearthscale/models/install', { target: card.id });
+    await refreshModels();
+  }
+
   async function enlarge(picture: Picture) {
-    if (!upscaler) return setPage('models');
+    if (!upscaler) return install(models!.absentUpscale[0]);
     const inputs = await hold([picture.path]);
     const run = newRun({
       kind: 'upscale',
@@ -784,6 +782,7 @@ export function Studio() {
   const columns: Column[] = compareRuns.map(({ run, picture }) => ({ run, picture, live: live.get(run.id) ?? null }));
   const fold = tips('fold', folded ? 'Show the library' : 'Hide the library');
   const lightboxItems = strip.length ? strip : shown ? [shown] : [];
+  const suggestedImage = models?.downloading.find((card) => card.kind === 'image') ?? models?.absentImage[0] ?? null;
   const stageProps: StageProps = {
     narrow,
     picture: stagePicture,
@@ -797,7 +796,10 @@ export function Studio() {
       ? `${stripRun.action === 'make' ? 'Making' : stripRun.action === 'enlarge' ? 'Enlarging' : 'Changing'} with ${stripRun.label}…`
       : '',
     noModel: !!models && imageCards.length === 0,
-    onGetModels: () => setPage('models'),
+    suggestion: suggestedImage
+      ? { label: suggestedImage.label, downloading: suggestedImage.state === 'downloading' }
+      : null,
+    onInstall: () => void (suggestedImage && install(suggestedImage).catch((e) => setProblem(reason(e)))),
     onIdea: setWords,
     tool: currentTool,
     onTool: (next) => {
@@ -824,13 +826,11 @@ export function Studio() {
   const title =
     page === 'compare'
       ? 'Compare models'
-      : page === 'models'
-        ? 'Get models'
-        : stagePicture
-          ? stagePicture.prompt || 'Opened picture'
-          : stripRun && stripLive
-            ? stripRun.prompt
-            : 'New picture';
+      : stagePicture
+        ? stagePicture.prompt || 'Opened picture'
+        : stripRun && stripLive
+          ? stripRun.prompt
+          : 'New picture';
   const away = () => {
     if (cramped) setFolded(true);
   };
@@ -942,82 +942,69 @@ export function Studio() {
             onShow={(picture) => (setPage('studio'), void show(picture))}
             onUse={(card) => setPrefs({ model: card })}
             onCancel={(run) => void cancelRun(run)}
-            onGetModels={() => setPage('models')}
           />
         )}
-        {page === 'models' && models && (
-          <ModelsPage
-            models={models}
-            downloads={downloads}
-            current={model?.id ?? null}
-            onUse={(card) => (setPrefs({ model: card }), setPage('studio'))}
-            onInstalled={() => void refreshModels()}
+        <div className="is-dock">
+          {problem && (
+            <Notice>
+              {problem}
+              <button className="hs-link" onClick={() => setProblem(null)}>
+                Close
+              </button>
+            </Notice>
+          )}
+          <PromptBar
+            words={words}
+            onWords={setWords}
+            onSubmit={() => void submit()}
+            action={LABELS[action]}
+            example={EXAMPLES[action]}
+            ready={ready}
+            busy={starting}
+            source={editing ? source : null}
+            references={editing && abilities.edit ? references : []}
+            onDropSource={() => {
+              setSource(null);
+              setReferences([]);
+            }}
+            onDropReference={(id) => setReferences((before) => before.filter((r) => r.id !== id))}
+            onOpenFile={(file) => void openFile(file)}
+            canAddReference={editing && abilities.edit && references.length < 9}
+            models={imageCards}
+            model={model}
+            abilities={abilities}
+            onModel={(id) => setPrefs({ model: id })}
+            shape={prefs.shape}
+            onShape={(shape) => setPrefs({ shape })}
+            size={prefs.size}
+            onSize={(size) => setPrefs({ size })}
+            style={prefs.style}
+            onStyle={(style) => setPrefs({ style })}
+            count={Math.min(prefs.count, abilities.count)}
+            onCount={(count) => setPrefs({ count })}
+            showCount={action !== 'erase' && action !== 'extend' && action !== 'compare'}
+            comparing={action === 'compare'}
+            advanced={advanced}
+            onAdvanced={setAdvanced}
+            mode={mode}
+            onMode={setMode}
+            showMode={
+              editing &&
+              abilities.edit &&
+              abilities.change &&
+              action !== 'fill' &&
+              action !== 'erase' &&
+              action !== 'extend'
+            }
+            amount={action === 'change' || action === 'fill' ? amount : null}
+            onAmount={setAmount}
+            onImprove={chat ? () => void improve() : null}
+            onDescribe={
+              chat?.vision && (editing ? source : shown) ? () => void describe((editing ? source : shown)!) : null
+            }
+            helping={helping}
           />
-        )}
-        {page !== 'models' && (
-          <div className="is-dock">
-            {problem && (
-              <Notice>
-                {problem}
-                <button className="hs-link" onClick={() => setProblem(null)}>
-                  Close
-                </button>
-              </Notice>
-            )}
-            <PromptBar
-              words={words}
-              onWords={setWords}
-              onSubmit={() => void submit()}
-              action={LABELS[action]}
-              example={EXAMPLES[action]}
-              ready={ready}
-              busy={starting}
-              source={editing ? source : null}
-              references={editing && abilities.edit ? references : []}
-              onDropSource={() => {
-                setSource(null);
-                setReferences([]);
-              }}
-              onDropReference={(id) => setReferences((before) => before.filter((r) => r.id !== id))}
-              onOpenFile={(file) => void openFile(file)}
-              canAddReference={editing && abilities.edit && references.length < 9}
-              models={imageCards}
-              model={model}
-              abilities={abilities}
-              onModel={(id) => setPrefs({ model: id })}
-              onGetModels={() => setPage('models')}
-              shape={prefs.shape}
-              onShape={(shape) => setPrefs({ shape })}
-              size={prefs.size}
-              onSize={(size) => setPrefs({ size })}
-              style={prefs.style}
-              onStyle={(style) => setPrefs({ style })}
-              count={Math.min(prefs.count, abilities.count)}
-              onCount={(count) => setPrefs({ count })}
-              showCount={action !== 'erase' && action !== 'extend' && action !== 'compare'}
-              comparing={action === 'compare'}
-              advanced={advanced}
-              onAdvanced={setAdvanced}
-              mode={mode}
-              onMode={setMode}
-              showMode={
-                editing &&
-                abilities.edit &&
-                abilities.change &&
-                action !== 'fill' &&
-                action !== 'erase' &&
-                action !== 'extend'
-              }
-              amount={action === 'change' || action === 'fill' ? amount : null}
-              onAmount={setAmount}
-              onImprove={chat ? () => void improve() : null}
-              onDescribe={
-                chat?.vision && (editing ? source : shown) ? () => void describe((editing ? source : shown)!) : null
-              }
-              helping={helping}
-            />
-          </div>
-        )}
+        </div>
       </main>
       {large !== null && lightboxItems.length > 0 && (
         <Lightbox
