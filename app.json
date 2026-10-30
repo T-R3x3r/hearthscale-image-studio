@@ -22,7 +22,16 @@
     "cards": [
       {
         "title": "Pictures from a few words.",
-        "text": "Image Studio makes and changes pictures with the image models on this computer, and keeps every one in its library."
+        "text": "Image Studio makes and changes pictures with the image models on this computer, and keeps every one in its library.",
+        "download": {
+          "kind": "image",
+          "repo": "leejet/FLUX.2-klein-4B-GGUF",
+          "file": "flux-2-klein-4b-Q4_0.gguf",
+          "companions": [
+            { "role": "vae", "repo": "Comfy-Org/Flux-2-Klein-4B", "file": "split_files/vae/flux2-vae.safetensors" },
+            { "role": "llm", "repo": "unsloth/Qwen3-4B-GGUF", "file": "Qwen3-4B-Q4_K_M.gguf" }
+          ]
+        }
       },
       {
         "title": "Make a picture, then change it.",
