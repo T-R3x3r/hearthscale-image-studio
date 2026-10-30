@@ -173,10 +173,21 @@ body {
   box-shadow: var(--focus);
 }
 
+/* The favourite's mark sits on a dark disc, so it shows on a light picture
+   as on a dark one. */
 .is-thumb-mark {
   position: absolute;
   right: var(--space);
   bottom: var(--space);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: calc(var(--space) * 4);
+  height: calc(var(--space) * 4);
+  border: var(--bw) solid var(--glass-on-dark-rim);
+  border-radius: var(--r-pill);
+  background: var(--glass-on-dark);
+  box-sizing: border-box;
   color: var(--glass-on-dark-ink);
 }
 
