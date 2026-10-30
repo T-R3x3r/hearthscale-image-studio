@@ -105,217 +105,223 @@ export function PromptBar(props: {
   const chips = [props.source, ...props.references].filter((p): p is Picture => !!p);
 
   return (
-    <div className="is-prompt hs-card" data-variant="glass">
-      {chips.length > 0 && (
-        <div className="is-prompt-pictures">
-          {chips.map((picture, index) => (
-            <span key={picture.id} className="is-prompt-picture">
-              <img src={fileUrl(picture.path)} alt={picture.prompt} />
-              {chips.length > 1 && <span className="is-prompt-number">{index + 1}</span>}
-              <button
-                className="is-prompt-drop"
-                aria-label="Remove from the prompt"
-                onClick={() => (index === 0 ? props.onDropSource() : props.onDropReference(picture.id))}
-              >
-                <Icon name="close-line" size={12} />
-              </button>
-            </span>
-          ))}
+    <div className="hs-composer">
+      <div className="hs-composer-main">
+        {chips.length > 0 && (
+          <div className="hs-composer-shelf">
+            <div className="hs-shelf-tiles">
+              {chips.map((picture, index) => (
+                <div key={picture.id} className="hs-shelf-tile">
+                  <img className="is-shelf-picture" src={fileUrl(picture.path)} alt={picture.prompt} />
+                  {chips.length > 1 && <span className="is-prompt-number">{index + 1}</span>}
+                  <button
+                    className="hs-shelf-remove"
+                    aria-label="Remove from the prompt"
+                    onClick={() => (index === 0 ? props.onDropSource() : props.onDropReference(picture.id))}
+                  >
+                    <Icon name="close-line" size={12} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+        <div className="hs-composer-field">
+          <textarea
+            className="hs-composer-editor is-words"
+            rows={2}
+            value={props.words}
+            placeholder={props.source ? 'Describe the change' : 'Describe a picture'}
+            aria-label="Prompt"
+            onChange={(e) => props.onWords(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
+                e.preventDefault();
+                if (props.ready) props.onSubmit();
+              }
+            }}
+          />
         </div>
-      )}
-      <textarea
-        className="hs-ta is-words"
-        rows={2}
-        value={props.words}
-        placeholder={props.source ? 'Describe the change' : 'Describe a picture'}
-        aria-label="Prompt"
-        onChange={(e) => props.onWords(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
-            e.preventDefault();
-            if (props.ready) props.onSubmit();
-          }
-        }}
-      />
-      <div className="is-prompt-row">
-        {!props.comparing && (!props.source || props.canAddReference) && (
-          <span {...add.hover} className="is-tipwrap">
-            <IconButton
-              aria-label={props.source ? 'Add a picture to the prompt' : 'Open a picture'}
-              onClick={() => file.current?.click()}
-            >
-              <Icon name="image-add-line" size={16} />
-            </IconButton>
-            {add.tip}
-          </span>
-        )}
-        <input
-          ref={file}
-          type="file"
-          accept="image/png,image/jpeg,image/webp"
-          hidden
-          onChange={(e) => {
-            const picked = e.target.files?.[0];
-            e.target.value = '';
-            if (picked) props.onOpenFile(picked);
-          }}
-        />
-        {!props.comparing && (
-          <Menu
-            label="Image model"
-            value={props.model?.label ?? 'No image model'}
-            icon={<Icon name="image-ai-line" size={14} />}
-          >
-            {(close) => (
-              <>
-                {props.models.map((card) => (
-                  <MItem
-                    key={card.id}
-                    label={card.label}
-                    chip={gigabytes(card.sizeBytes)}
-                    checked={card.id === props.model?.id}
-                    onClick={() => (close(), props.onModel(card.id))}
-                  />
-                ))}
-                {props.models.length > 0 && <MDivider />}
-                <MItem
-                  icon={<Icon name="download-cloud-2-line" size={14} />}
-                  label="Get more models"
-                  onClick={() => (close(), props.onGetModels())}
-                />
-              </>
-            )}
-          </Menu>
-        )}
-        {!props.source && (
-          <>
+        <div className="hs-composer-footer is-prompt-row">
+          {!props.comparing && (!props.source || props.canAddReference) && (
+            <span {...add.hover} className="is-tipwrap">
+              <IconButton
+                aria-label={props.source ? 'Add a picture to the prompt' : 'Open a picture'}
+                onClick={() => file.current?.click()}
+              >
+                <Icon name="image-add-line" size={16} />
+              </IconButton>
+              {add.tip}
+            </span>
+          )}
+          <input
+            ref={file}
+            type="file"
+            accept="image/png,image/jpeg,image/webp"
+            hidden
+            onChange={(e) => {
+              const picked = e.target.files?.[0];
+              e.target.value = '';
+              if (picked) props.onOpenFile(picked);
+            }}
+          />
+          {!props.comparing && (
             <Menu
-              label="Shape and size"
-              value={`${SHAPES.find((s) => s.id === props.shape)!.label}, ${SIZES.find((s) => s.id === props.size)!.label.toLowerCase()}`}
-              icon={<Icon name="aspect-ratio-line" size={14} />}
+              label="Image model"
+              value={props.model?.label ?? 'No image model'}
+              icon={<Icon name="image-ai-line" size={14} />}
             >
               {(close) => (
                 <>
-                  <MSection>Shape</MSection>
-                  {SHAPES.map((shape) => (
+                  {props.models.map((card) => (
                     <MItem
-                      key={shape.id}
-                      label={shape.label}
-                      checked={shape.id === props.shape}
-                      onClick={() => (close(), props.onShape(shape.id))}
+                      key={card.id}
+                      label={card.label}
+                      chip={gigabytes(card.sizeBytes)}
+                      checked={card.id === props.model?.id}
+                      onClick={() => (close(), props.onModel(card.id))}
                     />
                   ))}
-                  <MDivider />
-                  <MSection>Size</MSection>
-                  {SIZES.map((size) => (
-                    <MItem
-                      key={size.id}
-                      label={size.label}
-                      checked={size.id === props.size}
-                      onClick={() => (close(), props.onSize(size.id))}
-                    />
-                  ))}
+                  {props.models.length > 0 && <MDivider />}
+                  <MItem
+                    icon={<Icon name="download-cloud-2-line" size={14} />}
+                    label="Get more models"
+                    onClick={() => (close(), props.onGetModels())}
+                  />
                 </>
               )}
             </Menu>
-          </>
-        )}
-        <Menu
-          label="Style"
-          value={STYLES.find((s) => s.id === props.style)?.label ?? 'No style'}
-          icon={<Icon name="palette-line" size={14} />}
-        >
-          {(close) => (
+          )}
+          {!props.source && (
             <>
-              <MItem label="No style" checked={props.style === null} onClick={() => (close(), props.onStyle(null))} />
-              <MDivider />
-              {STYLES.map((style) => (
-                <MItem
-                  key={style.id}
-                  label={style.label}
-                  checked={style.id === props.style}
-                  onClick={() => (close(), props.onStyle(style.id))}
-                />
-              ))}
+              <Menu
+                label="Shape and size"
+                value={`${SHAPES.find((s) => s.id === props.shape)!.label}, ${SIZES.find((s) => s.id === props.size)!.label.toLowerCase()}`}
+                icon={<Icon name="aspect-ratio-line" size={14} />}
+              >
+                {(close) => (
+                  <>
+                    <MSection>Shape</MSection>
+                    {SHAPES.map((shape) => (
+                      <MItem
+                        key={shape.id}
+                        label={shape.label}
+                        checked={shape.id === props.shape}
+                        onClick={() => (close(), props.onShape(shape.id))}
+                      />
+                    ))}
+                    <MDivider />
+                    <MSection>Size</MSection>
+                    {SIZES.map((size) => (
+                      <MItem
+                        key={size.id}
+                        label={size.label}
+                        checked={size.id === props.size}
+                        onClick={() => (close(), props.onSize(size.id))}
+                      />
+                    ))}
+                  </>
+                )}
+              </Menu>
             </>
           )}
-        </Menu>
-        {props.showCount && props.abilities.count > 1 && (
-          <Menu label="How many" value={props.count === 1 ? '1 picture' : `${props.count} pictures`}>
-            {(close) =>
-              [1, 2, 4]
-                .filter((n) => n <= props.abilities.count)
-                .map((n) => (
+          <Menu
+            label="Style"
+            value={STYLES.find((s) => s.id === props.style)?.label ?? 'No style'}
+            icon={<Icon name="palette-line" size={14} />}
+          >
+            {(close) => (
+              <>
+                <MItem label="No style" checked={props.style === null} onClick={() => (close(), props.onStyle(null))} />
+                <MDivider />
+                {STYLES.map((style) => (
                   <MItem
-                    key={n}
-                    label={n === 1 ? '1 picture' : `${n} pictures`}
-                    checked={n === props.count}
-                    onClick={() => (close(), props.onCount(n))}
+                    key={style.id}
+                    label={style.label}
+                    checked={style.id === props.style}
+                    onClick={() => (close(), props.onStyle(style.id))}
                   />
-                ))
-            }
+                ))}
+              </>
+            )}
           </Menu>
-        )}
-        <span {...more.hover} className="is-tipwrap">
-          <IconButton aria-label="More settings" onClick={(e) => setAdvancedAt(e.currentTarget)}>
-            <Icon name="equalizer-line" size={16} />
-          </IconButton>
-          {more.tip}
-        </span>
-        {props.showMode && (
-          <SegmentedControl
-            label="How to change the picture"
-            value={props.mode}
-            options={[
-              { value: 'edit', label: 'Follow my words' },
-              { value: 'redraw', label: 'Redraw' },
-            ]}
-            onChange={props.onMode}
-          />
-        )}
-        {props.amount !== null && <span className="is-bar-label">How much</span>}
-        {props.amount !== null && (
-          <div className="is-amount">
-            <Slider
-              label="How much to change"
-              value={props.amount}
-              onChange={props.onAmount}
-              min={0.05}
-              max={1}
-              step={0.05}
-              shown={`${Math.round(props.amount * 100)}%`}
+          {props.showCount && props.abilities.count > 1 && (
+            <Menu label="How many" value={props.count === 1 ? '1 picture' : `${props.count} pictures`}>
+              {(close) =>
+                [1, 2, 4]
+                  .filter((n) => n <= props.abilities.count)
+                  .map((n) => (
+                    <MItem
+                      key={n}
+                      label={n === 1 ? '1 picture' : `${n} pictures`}
+                      checked={n === props.count}
+                      onClick={() => (close(), props.onCount(n))}
+                    />
+                  ))
+              }
+            </Menu>
+          )}
+          <span {...more.hover} className="is-tipwrap">
+            <IconButton aria-label="More settings" onClick={(e) => setAdvancedAt(e.currentTarget)}>
+              <Icon name="equalizer-line" size={16} />
+            </IconButton>
+            {more.tip}
+          </span>
+          {props.showMode && (
+            <SegmentedControl
+              label="How to change the picture"
+              value={props.mode}
+              options={[
+                { value: 'edit', label: 'Follow my words' },
+                { value: 'redraw', label: 'Redraw' },
+              ]}
+              onChange={props.onMode}
             />
-          </div>
-        )}
-        <span className="is-prompt-end">
-          {props.onDescribe && (
-            <span {...describe.hover} className="is-tipwrap">
-              <IconButton aria-label="Describe this picture" disabled={props.helping} onClick={props.onDescribe}>
-                <Icon name="eye-line" size={16} />
-              </IconButton>
-              {describe.tip}
-            </span>
           )}
-          {props.onImprove && (
-            <span {...improve.hover} className="is-tipwrap">
-              <IconButton
-                aria-label="Improve my words"
-                disabled={props.helping || !props.words.trim()}
-                onClick={props.onImprove}
-              >
-                <Icon
-                  name={props.helping ? 'loader-4-line' : 'magic-line'}
-                  size={16}
-                  className={props.helping ? 'hs-spin' : undefined}
-                />
-              </IconButton>
-              {improve.tip}
-            </span>
+          {props.amount !== null && <span className="is-bar-label">How much</span>}
+          {props.amount !== null && (
+            <div className="is-amount">
+              <Slider
+                label="How much to change"
+                value={props.amount}
+                onChange={props.onAmount}
+                min={0.05}
+                max={1}
+                step={0.05}
+                shown={`${Math.round(props.amount * 100)}%`}
+              />
+            </div>
           )}
-          <Button variant="primary" size="sm" disabled={!props.ready || props.busy} onClick={props.onSubmit}>
-            {props.action}
-          </Button>
-        </span>
+          <span className="is-prompt-end">
+            {props.onDescribe && (
+              <span {...describe.hover} className="is-tipwrap">
+                <IconButton aria-label="Describe this picture" disabled={props.helping} onClick={props.onDescribe}>
+                  <Icon name="eye-line" size={16} />
+                </IconButton>
+                {describe.tip}
+              </span>
+            )}
+            {props.onImprove && (
+              <span {...improve.hover} className="is-tipwrap">
+                <IconButton
+                  aria-label="Improve my words"
+                  disabled={props.helping || !props.words.trim()}
+                  onClick={props.onImprove}
+                >
+                  <Icon
+                    name={props.helping ? 'loader-4-line' : 'magic-line'}
+                    size={16}
+                    className={props.helping ? 'hs-spin' : undefined}
+                  />
+                </IconButton>
+                {improve.tip}
+              </span>
+            )}
+            <Button variant="primary" size="sm" disabled={!props.ready || props.busy} onClick={props.onSubmit}>
+              {props.action}
+            </Button>
+          </span>
+        </div>
       </div>
       {advancedAt && (
         <Popover anchor={advancedAt} placement="top-start" label="More settings" onDismiss={() => setAdvancedAt(null)}>
