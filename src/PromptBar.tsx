@@ -70,6 +70,31 @@ function Menu(props: { label: string; value: string; icon?: ReactNode; children:
   );
 }
 
+/** A setting set on a scale, under its label, as a form's fields are. */
+function SliderField(props: {
+  label: string;
+  value: number;
+  onChange: (value: number) => void;
+  min: number;
+  max: number;
+  step: number;
+}) {
+  return (
+    <div className="hs-text-field">
+      <span className="hs-field-label">{props.label}</span>
+      <Slider
+        label={props.label}
+        value={props.value}
+        onChange={props.onChange}
+        min={props.min}
+        max={props.max}
+        step={props.step}
+        shown={String(props.value)}
+      />
+    </div>
+  );
+}
+
 /** Where Hearthscale draws its picker of the app's image model. The place
  *  takes the footer's free room, so the picker, drawn at its left, follows
  *  the other controls whatever the length of the model's name. */
@@ -371,25 +396,29 @@ export function PromptBar(props: {
             {props.abilities.steps &&
               explained(
                 'steps',
-                'More steps take longer and can add detail',
-                <TextField
-                  label="Steps"
-                  inputMode="numeric"
-                  placeholder="Automatic"
-                  value={props.advanced.steps}
-                  onChange={set('steps')}
+                'More detail takes longer',
+                <SliderField
+                  label="Detail"
+                  min={1}
+                  max={50}
+                  step={1}
+                  value={Number(props.advanced.steps) || props.abilities.stepsDefault}
+                  onChange={(value) => props.onAdvanced({ ...props.advanced, steps: String(value) })}
                 />,
               )}
             {props.abilities.guidance &&
               explained(
                 'guidance',
-                'How closely the picture follows the words',
-                <TextField
-                  label="Prompt strength"
-                  inputMode="decimal"
-                  placeholder="Automatic"
-                  value={props.advanced.guidance}
-                  onChange={set('guidance')}
+                'How closely the picture follows your words',
+                <SliderField
+                  label="Follow the words"
+                  min={0}
+                  max={20}
+                  step={0.5}
+                  value={
+                    props.advanced.guidance === '' ? props.abilities.guidanceDefault : Number(props.advanced.guidance)
+                  }
+                  onChange={(value) => props.onAdvanced({ ...props.advanced, guidance: String(value) })}
                 />,
               )}
             {props.abilities.seed &&
@@ -397,9 +426,9 @@ export function PromptBar(props: {
                 'seed',
                 'The same number and the same words make the same picture again',
                 <TextField
-                  label="Variation number"
+                  label="Picture number"
                   inputMode="numeric"
-                  placeholder="Random"
+                  placeholder="1234"
                   value={props.advanced.seed}
                   onChange={set('seed')}
                 />,

@@ -21,6 +21,9 @@ export interface Abilities {
   seed: boolean;
   steps: boolean;
   guidance: boolean;
+  /** The steps and the guidance the model takes when the job names none. */
+  stepsDefault: number;
+  guidanceDefault: number;
   /** The most pictures one job draws. */
   count: number;
   strength: number;
@@ -38,6 +41,8 @@ export function abilitiesOf(card: ModelCard | undefined): Abilities {
     seed: 'seed' in props,
     steps: 'steps' in props,
     guidance: 'guidance' in props,
+    stepsDefault: props.steps?.default ?? 20,
+    guidanceDefault: props.guidance?.default ?? 7,
     count: props.count?.maximum ?? 1,
     strength: props.strength?.default ?? 0.75,
   };
