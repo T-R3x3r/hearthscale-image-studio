@@ -395,6 +395,10 @@ body {
   cursor: pointer;
 }
 
+.is-bar-toggle:active {
+  background: var(--pressed);
+}
+
 .is-bar-popover {
   display: flex;
   flex-direction: column;
