@@ -357,6 +357,10 @@ body {
   box-sizing: border-box;
 }
 
+.is-page + .is-dock {
+  padding-top: calc(var(--space) * 4);
+}
+
 .is-problem .hs-link {
   margin-left: var(--space);
 }
