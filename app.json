@@ -47,7 +47,8 @@
         "title": "Enlarge and compare.",
         "rows": [
           { "icon": "image", "title": "Enlarge", "text": "Make a larger, sharper copy of a picture." },
-          { "icon": "eye", "title": "Compare", "text": "Make the same picture with two or more models, side by side." }
+          { "icon": "eye", "title": "Compare", "text": "Make the same picture with two or more models, side by side." },
+          { "icon": "back", "title": "Before and after", "text": "Slide a line across a changed picture to see how it was before." }
         ]
       },
       {
