@@ -12,10 +12,9 @@ body {
 }
 
 .is-studio {
-  /* The row the top bar's controls and the library's first row share, under
-     the sidebar's own top inset. */
-  --studio-bar: calc(var(--space) * 9.5);
-  --studio-head: calc(var(--pad-sidebar) + var(--studio-bar));
+  /* The top bar: a control's height with the sidebar's inset above and
+     below, so its controls and the library's first row share one line. */
+  --studio-head: calc(var(--h-ctl) + var(--pad-sidebar) * 2);
   /* The column a page's content and the prompt share, and the inset beside
      it: a page scroller's own inset and the scrollbar room it keeps. */
   --studio-column: calc(var(--content-width) + var(--space) * 25.5);
@@ -58,7 +57,7 @@ body {
   display: flex;
   flex: none;
   align-items: center;
-  height: var(--studio-bar);
+  height: var(--h-ctl);
 }
 
 .is-library-head {
@@ -185,7 +184,7 @@ body {
   align-items: center;
   gap: var(--gap-inline);
   height: var(--studio-head);
-  padding: var(--pad-sidebar) calc(var(--space) * 3.5) 0;
+  padding: 0 calc(var(--space) * 3.5);
   border-bottom: var(--bw) solid var(--line);
   box-sizing: border-box;
 }
