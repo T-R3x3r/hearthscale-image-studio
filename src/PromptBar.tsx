@@ -62,7 +62,7 @@ function Menu(props: { label: string; value: string; icon?: ReactNode; children:
         <Icon name="arrow-down-s-line" size={14} className="hs-model-trigger-chevron" />
       </button>
       {anchor && (
-        <MenuSurface anchor={anchor} dir="up" maxHeight={360} onDismiss={() => setAnchor(null)}>
+        <MenuSurface anchor={anchor} dir="up" onDismiss={() => setAnchor(null)}>
           {props.children(() => setAnchor(null))}
         </MenuSurface>
       )}
