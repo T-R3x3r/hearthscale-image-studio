@@ -787,6 +787,7 @@ export function Studio() {
   const suggestedImage = models?.downloading.find((card) => card.kind === 'image') ?? models?.absentImage[0] ?? null;
   const stageProps: StageProps = {
     narrow,
+    compact: cramped,
     mode,
     onMode: setMode,
     showMode:

@@ -364,6 +364,10 @@ body {
   cursor: pointer;
 }
 
+.is-bar-popover {
+  width: calc(var(--space) * 56);
+}
+
 .is-bar-label {
   margin-left: var(--gap-row);
   color: var(--mut);

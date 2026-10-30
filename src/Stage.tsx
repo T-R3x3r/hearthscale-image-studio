@@ -11,6 +11,7 @@ import {
   Meter,
   Notice,
   PictureCompare,
+  Popover,
   SegmentedControl,
   Slider,
   StatusWord,
@@ -160,10 +161,63 @@ function BarToggle(props: { on: boolean; onClick: () => void; children: ReactNod
   );
 }
 
+/** A slider of the bar: beside its label, or in a compact bar behind a
+ *  press of the label that opens it. */
+function BarSlider(props: {
+  compact: boolean;
+  label: string;
+  value: number;
+  onChange: (value: number) => void;
+  min: number;
+  max: number;
+  step: number;
+  shown: string;
+}) {
+  const [at, setAt] = useState<HTMLElement | null>(null);
+  const slider = (
+    <Slider
+      label={props.label}
+      min={props.min}
+      max={props.max}
+      step={props.step}
+      value={props.value}
+      onChange={props.onChange}
+      shown={props.shown}
+    />
+  );
+  if (!props.compact) {
+    return (
+      <>
+        <span className="is-bar-label">{props.label}</span>
+        <div className="is-bar-slider">{slider}</div>
+      </>
+    );
+  }
+  return (
+    <>
+      <Button
+        variant="ghost"
+        size="sm"
+        trailingIcon={<Icon name="arrow-down-s-line" size={14} />}
+        onClick={(e) => setAt(e.currentTarget)}
+      >
+        {props.label}
+      </Button>
+      {at && (
+        <Popover anchor={at} placement="bottom-end" label={props.label} onDismiss={() => setAt(null)}>
+          <div className="is-bar-popover">{slider}</div>
+        </Popover>
+      )}
+    </>
+  );
+}
+
 /** What the stage and its bar show, and what they report. */
 export interface StageProps {
   /** Whether the bar keeps only its main actions and puts the rest in the More menu. */
   narrow: boolean;
+  /** Whether the tools' bars put their sides and their sliders behind presses that open them. */
+  compact: boolean;
   picture: Picture | null;
   size: { width: number; height: number } | null;
   source: Picture | null;
@@ -323,6 +377,7 @@ export function Stage(props: StageProps) {
 /** The actions of the picture on the stage, or the options of the tool in use. */
 export function StageBar(props: StageProps) {
   const [menu, setMenu] = useState<MenuAnchor | null>(null);
+  const [sidesMenu, setSidesMenu] = useState<MenuAnchor | null>(null);
   const [varyMenu, setVaryMenu] = useState<MenuAnchor | null>(null);
   const tips = useFloatingTips('bottom');
   const { picture } = props;
@@ -350,18 +405,16 @@ export function StageBar(props: StageProps) {
   } else if (isSource && props.tool === 'brush') {
     bar = (
       <>
-        <span className="is-bar-label">Brush size</span>
-        <div className="is-bar-slider">
-          <Slider
-            label="Brush size"
-            min={8}
-            max={160}
-            step={4}
-            value={props.brushSize}
-            onChange={props.onBrushSize}
-            shown={`${props.brushSize}`}
-          />
-        </div>
+        <BarSlider
+          compact={props.compact}
+          label="Brush size"
+          min={8}
+          max={160}
+          step={4}
+          value={props.brushSize}
+          onChange={props.onBrushSize}
+          shown={`${props.brushSize}`}
+        />
         {explained(
           'eraser',
           'Rub out brush strokes',
@@ -380,25 +433,45 @@ export function StageBar(props: StageProps) {
   } else if (isSource && props.tool === 'extend') {
     const flip = (side: 'left' | 'right' | 'top' | 'bottom') =>
       props.onSides({ ...props.sides, [side]: !props.sides[side] });
+    const sides = (['left', 'right', 'top', 'bottom'] as const).map((side) => ({
+      side,
+      label: side[0].toUpperCase() + side.slice(1),
+    }));
     bar = (
       <>
-        {(['left', 'right', 'top', 'bottom'] as const).map((side) => (
-          <BarToggle key={side} on={props.sides[side]} onClick={() => flip(side)}>
-            {side[0].toUpperCase() + side.slice(1)}
-          </BarToggle>
-        ))}
-        <span className="is-bar-label">Extend by</span>
-        <div className="is-bar-slider">
-          <Slider
-            label="Extend by"
-            min={0.1}
-            max={0.5}
-            step={0.05}
-            value={props.sides.share}
-            onChange={(share) => props.onSides({ ...props.sides, share })}
-            shown={`${Math.round(props.sides.share * 100)}%`}
-          />
-        </div>
+        {props.compact ? (
+          <Button
+            variant="ghost"
+            size="sm"
+            trailingIcon={<Icon name="arrow-down-s-line" size={14} />}
+            onClick={(e) => setSidesMenu(anchorFrom('sides', e))}
+          >
+            Sides
+          </Button>
+        ) : (
+          sides.map(({ side, label }) => (
+            <BarToggle key={side} on={props.sides[side]} onClick={() => flip(side)}>
+              {label}
+            </BarToggle>
+          ))
+        )}
+        {sidesMenu && (
+          <MenuSurface anchor={sidesMenu} dir="down" onDismiss={() => setSidesMenu(null)}>
+            {sides.map(({ side, label }) => (
+              <MItem key={side} label={label} checked={props.sides[side]} onClick={() => flip(side)} />
+            ))}
+          </MenuSurface>
+        )}
+        <BarSlider
+          compact={props.compact}
+          label="Extend by"
+          min={0.1}
+          max={0.5}
+          step={0.05}
+          value={props.sides.share}
+          onChange={(share) => props.onSides({ ...props.sides, share })}
+          shown={`${Math.round(props.sides.share * 100)}%`}
+        />
         <Button variant="secondary" size="sm" onClick={() => props.onTool('none')}>
           Done
         </Button>
@@ -421,33 +494,61 @@ export function StageBar(props: StageProps) {
               onChange={props.onMode}
             />,
           )}
-        {explained(
-          'brush',
-          'Paint over a part to fill it or erase it',
-          <Button
-            variant="ghost"
-            size="sm"
-            icon={<Icon name="paint-brush-line" size={14} />}
-            onClick={() => props.onTool('brush')}
-          >
-            Brush
-          </Button>,
+        {props.narrow ? (
+          <>
+            {explained(
+              'brush',
+              'Brush: paint over a part to fill it or erase it',
+              <IconButton aria-label="Brush" onClick={() => props.onTool('brush')}>
+                <Icon name="paint-brush-line" size={16} />
+              </IconButton>,
+            )}
+            {explained(
+              'extend',
+              'Extend: grow the picture past its edges',
+              <IconButton aria-label="Extend" onClick={() => props.onTool('extend')}>
+                <Icon name="expand-diagonal-line" size={16} />
+              </IconButton>,
+            )}
+            {explained(
+              'stop',
+              'Stop editing',
+              <IconButton aria-label="Stop editing" onClick={props.onStopEditing}>
+                <Icon name="close-line" size={16} />
+              </IconButton>,
+            )}
+          </>
+        ) : (
+          <>
+            {explained(
+              'brush',
+              'Paint over a part to fill it or erase it',
+              <Button
+                variant="ghost"
+                size="sm"
+                icon={<Icon name="paint-brush-line" size={14} />}
+                onClick={() => props.onTool('brush')}
+              >
+                Brush
+              </Button>,
+            )}
+            {explained(
+              'extend',
+              'Grow the picture past its edges',
+              <Button
+                variant="ghost"
+                size="sm"
+                icon={<Icon name="expand-diagonal-line" size={14} />}
+                onClick={() => props.onTool('extend')}
+              >
+                Extend
+              </Button>,
+            )}
+            <Button variant="ghost" size="sm" icon={<Icon name="close-line" size={14} />} onClick={props.onStopEditing}>
+              Stop editing
+            </Button>
+          </>
         )}
-        {explained(
-          'extend',
-          'Grow the picture past its edges',
-          <Button
-            variant="ghost"
-            size="sm"
-            icon={<Icon name="expand-diagonal-line" size={14} />}
-            onClick={() => props.onTool('extend')}
-          >
-            Extend
-          </Button>,
-        )}
-        <Button variant="ghost" size="sm" icon={<Icon name="close-line" size={14} />} onClick={props.onStopEditing}>
-          Stop editing
-        </Button>
       </>
     );
   } else if (picture && actions) {
