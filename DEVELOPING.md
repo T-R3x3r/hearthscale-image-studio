@@ -18,8 +18,7 @@ The view is one ES module, `views/studio.js`, built with esbuild from
 library stays external, because Hearthscale gives every view its own copy.
 `backend.ts` is bundled by `hearthscale dev` and `hearthscale pack`.
 
-`@hearthscale/app` and `@hearthscale/app-ui` come from npm. Before their
-release, `package.json` names the builder kit's `.tgz` files instead.
+`@hearthscale/app` and `@hearthscale/app-ui` come from npm.
 
 ## What runs where
 
@@ -33,10 +32,11 @@ data folder (`save` of `ctx.jobs.submit`) and read a picture of that folder
 as an asset a job takes (`ctx.assets.import`).
 
 - `make` submits an `image` or `upscale` job on the model the view names: the
-  app's model of that kind, read just before the run, or a run's own model
-  for Make more and Compare. Its outputs are saved into `pictures/<run id>/`
-  of the data folder. A job a view's call starts is interactive, so it runs
-  before batch work.
+  app's model of that kind, which the view follows through
+  `hearthscale/models/chosen`, or a run's own model for Make more and
+  Compare. Its outputs are saved into `pictures/<run id>/` of the data
+  folder. A job a view's call starts is interactive, so it runs before batch
+  work.
 - `hold` makes a library picture an asset for a job or for a chat model, and
   `release` drops those assets once the job has ended.
 - `keep` writes a picture the person opened into the library.
