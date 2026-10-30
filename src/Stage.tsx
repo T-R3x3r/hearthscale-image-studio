@@ -588,11 +588,12 @@ export function StageBar(props: StageProps) {
           )}
         <span {...favourite.hover} className="is-tipwrap">
           <IconButton
+            className={picture.favourite ? 'hs-boxsel' : undefined}
             aria-label={picture.favourite ? 'Remove from favourites' : 'Add to favourites'}
             aria-pressed={picture.favourite}
             onClick={actions.favourite}
           >
-            <Icon name={picture.favourite ? 'heart-fill' : 'heart-line'} size={16} />
+            <Icon name="heart-line" size={16} />
           </IconButton>
           {favourite.tip}
         </span>
