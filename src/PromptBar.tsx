@@ -111,6 +111,8 @@ export function PromptBar(props: {
   /** Words the prompt shows while it is empty, as an example for the action. */
   example: string;
   ready: boolean;
+  /** Why the action is off, where the person can change that. */
+  why: string | null;
   busy: boolean;
   source: Picture | null;
   references: Picture[];
@@ -147,6 +149,7 @@ export function PromptBar(props: {
   const add = tips('add', props.source ? 'Add a picture to the prompt' : 'Open a picture');
   const improve = tips('improve', 'Improve my words');
   const describe = tips('describe', 'Describe this picture');
+  const off = tips('why', props.why ?? undefined);
   const { negative, steps, guidance, seed } = props.abilities;
   const settable = negative || steps || guidance || seed;
   const more = tips('advanced', settable ? 'More settings' : 'This model takes no more settings');
@@ -344,9 +347,12 @@ export function PromptBar(props: {
                 {improve.tip}
               </span>
             )}
-            <Button variant="primary" size="sm" disabled={!props.ready || props.busy} onClick={props.onSubmit}>
-              {props.action}
-            </Button>
+            <span {...off.hover} className="is-tipwrap">
+              <Button variant="primary" size="sm" disabled={!props.ready || props.busy} onClick={props.onSubmit}>
+                {props.action}
+              </Button>
+              {off.tip}
+            </span>
           </span>
         </div>
       </div>

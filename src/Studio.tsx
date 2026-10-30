@@ -451,6 +451,16 @@ export function Studio() {
       });
   }
 
+  /** Why the action is off, where the person can change that. */
+  const why = (() => {
+    if (!model || ready) return null;
+    if (action === 'compare' && prefs.compare.filter((id) => imageCards.some((c) => c.id === id)).length < 2) {
+      return 'Choose two or more models';
+    }
+    if (words.trim() || action === 'erase' || action === 'extend') return null;
+    return action === 'fill' ? 'Write what to put there' : 'Write what you want to see';
+  })();
+
   /** Starts a run and puts it on the stage while it makes; `again` starts
    *  the same run anew if this one fails. */
   async function begin(run: Run, input: Record<string, unknown>, again: () => Promise<unknown>) {
@@ -921,7 +931,7 @@ export function Studio() {
           <Library
             pictures={pictures}
             locale={locale}
-            shown={shown?.id ?? null}
+            shown={page === 'studio' ? (shown?.id ?? null) : null}
             words={search}
             favourites={favourites}
             page={page}
@@ -1025,6 +1035,7 @@ export function Studio() {
             action={LABELS[action]}
             example={EXAMPLES[action]}
             ready={ready}
+            why={why}
             busy={starting}
             source={editing ? source : null}
             references={editing && abilities.edit ? references : []}

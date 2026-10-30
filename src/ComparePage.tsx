@@ -2,6 +2,7 @@ import type { ModelCard } from '@hearthscale/app';
 import {
   Button,
   Chip,
+  EmptyState,
   Icon,
   Meter,
   ModelAvatar,
@@ -68,6 +69,11 @@ export function ComparePage(props: {
                   {card.label}
                 </Chip>
               ))}
+            </div>
+          )}
+          {props.columns.length === 0 && props.models.length >= 2 && (
+            <div className="is-compare-empty">
+              <EmptyState icon={<Icon name="contrast-2-line" size={30} />} title="No comparisons yet" />
             </div>
           )}
           {props.columns.length > 0 && (
