@@ -343,7 +343,7 @@ body {\r
   align-items: center;\r
   justify-content: center;\r
   gap: var(--gap-stack);\r
-  padding: 0 calc(var(--space) * 3.5) var(--gap-stack);\r
+  padding: 0 var(--studio-inset) var(--studio-inset);\r
 }\r
 \r
 .is-strip-item {\r
