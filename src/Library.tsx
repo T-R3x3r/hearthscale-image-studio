@@ -111,7 +111,7 @@ export function Library(props: {
         <VirtualList
           className="is-library-list"
           count={rows.length}
-          estimate={96}
+          estimate={68}
           rowKey={(i) => {
             const row = rows[i];
             return row.kind === 'day' ? `day-${row.label}` : row.pictures[0].id;

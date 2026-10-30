@@ -88,8 +88,6 @@ body {
 .hs-model-trigger:focus-visible,
 .is-tool:focus-visible,
 .is-nav-row:focus-visible,
-.is-thumb:focus-visible,
-.is-strip-item:focus-visible,
 .is-compare-picture:focus-visible {
   outline: none;
   box-shadow: var(--focus);
@@ -116,9 +114,10 @@ body {
 
 .is-thumbs {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--gap-inline);
-  padding: 0 calc(var(--space) * 2.5) var(--gap-inline);
+  grid-template-columns: repeat(3, calc(var(--space) * 15));
+  justify-content: space-between;
+  gap: var(--gap-stack);
+  padding: 0 calc(var(--space) * 2.5) var(--gap-stack);
 }
 
 .is-thumb {
@@ -127,7 +126,7 @@ body {
   padding: 0;
   overflow: hidden;
   border: 0;
-  border-radius: var(--r-sm);
+  border-radius: var(--r-card);
   background: var(--card);
   cursor: pointer;
 }
@@ -140,27 +139,31 @@ body {
   object-fit: cover;
 }
 
-/* The hover and selected rings lie inside the picture, so no edge of a
-   scroller can cut them. */
-.is-thumb::after,
-.is-strip-item::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  box-shadow: inset 0 0 0 calc(var(--bw) * 2) transparent;
+.is-thumb,
+.is-strip-item {
   transition: box-shadow var(--dur) var(--ease-out);
-  pointer-events: none;
 }
 
-.is-thumb:hover::after,
-.is-strip-item:not([data-making]):hover::after {
-  box-shadow: inset 0 0 0 calc(var(--bw) * 2) var(--cardb);
+/* A ring around the picture with a gap of the window's colour, so it shows
+   on a light picture as on a dark one. */
+.is-thumb:hover,
+.is-strip-item:not([data-making]):hover {
+  box-shadow:
+    0 0 0 var(--bw) var(--win),
+    0 0 0 calc(var(--bw) * 3) var(--cardb);
 }
 
-.is-thumb[data-on='true']::after,
-.is-strip-item[data-on='true']::after {
-  box-shadow: inset 0 0 0 calc(var(--bw) * 2) var(--selection-ink);
+.is-thumb[data-on='true'],
+.is-strip-item[data-on='true'] {
+  box-shadow:
+    0 0 0 var(--bw) var(--win),
+    0 0 0 calc(var(--bw) * 3) var(--selection-ink);
+}
+
+.is-thumb:focus-visible,
+.is-strip-item:focus-visible {
+  outline: none;
+  box-shadow: var(--focus);
 }
 
 .is-thumb-mark {
@@ -337,7 +340,6 @@ body {
 }
 
 .is-strip-item {
-  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -346,7 +348,7 @@ body {
   padding: 0;
   overflow: hidden;
   border: 0;
-  border-radius: var(--r-sm);
+  border-radius: var(--r-card);
   background: var(--card);
   cursor: pointer;
 }
