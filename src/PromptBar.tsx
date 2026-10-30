@@ -101,7 +101,9 @@ export function PromptBar(props: {
   const add = tips('add', props.source ? 'Add a picture to the prompt' : 'Open a picture');
   const improve = tips('improve', 'Improve my words');
   const describe = tips('describe', 'Describe this picture');
-  const more = tips('advanced', 'More settings');
+  const { negative, steps, guidance, seed } = props.abilities;
+  const settable = negative || steps || guidance || seed;
+  const more = tips('advanced', settable ? 'More settings' : 'This model takes no more settings');
   const chips = [props.source, ...props.references].filter((p): p is Picture => !!p);
 
   return (
@@ -262,7 +264,7 @@ export function PromptBar(props: {
             </Menu>
           )}
           <span {...more.hover} className="is-tipwrap">
-            <IconButton aria-label="More settings" onClick={(e) => setAdvancedAt(e.currentTarget)}>
+            <IconButton aria-label="More settings" disabled={!settable} onClick={(e) => setAdvancedAt(e.currentTarget)}>
               <Icon name="equalizer-line" size={16} />
             </IconButton>
             {more.tip}
