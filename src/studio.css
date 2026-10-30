@@ -177,11 +177,6 @@ body {
   box-sizing: border-box;
 }
 
-.is-toggle[aria-pressed='true'] {
-  background: var(--selection);
-  color: var(--selection-ink);
-}
-
 .is-stage {
   display: flex;
   flex: 1;

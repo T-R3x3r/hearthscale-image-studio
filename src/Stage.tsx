@@ -388,7 +388,7 @@ export function Stage(props: {
         )}
         <span {...favourite.hover} className="is-tipwrap">
           <IconButton
-            className="is-toggle"
+            className={picture.favourite ? 'hs-boxsel' : undefined}
             aria-label={picture.favourite ? 'Remove from favourites' : 'Add to favourites'}
             aria-pressed={picture.favourite}
             onClick={actions.favourite}
