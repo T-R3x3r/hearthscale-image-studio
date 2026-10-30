@@ -63,11 +63,19 @@ export function Library(props: {
 }) {
   const rows = useMemo(() => rowsOf(props.pictures, props.locale), [props.pictures, props.locale]);
   return (
-    <div className="hs-sidebar-column is-library">
+    <div className="hs-sidebar-column">
       <div className="is-library-head">
-        <Button variant="secondary" size="sm" fullWidth icon={<Icon name="add-line" size={14} />} onClick={props.onNew}>
-          New picture
-        </Button>
+        <div className="is-library-top">
+          <Button
+            variant="secondary"
+            size="sm"
+            fullWidth
+            icon={<Icon name="add-line" size={14} />}
+            onClick={props.onNew}
+          >
+            New picture
+          </Button>
+        </div>
         <nav className="is-library-nav">
           <button
             className={navRow(props.page === 'studio' && !props.favourites)}

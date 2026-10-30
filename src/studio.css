@@ -12,8 +12,10 @@ body {
 }
 
 .is-studio {
-  /* The height of the top bar, whose band the library's first row shares. */
+  /* The row the top bar's controls and the library's first row share, under
+     the sidebar's own top inset. */
   --studio-bar: calc(var(--space) * 9.5);
+  --studio-head: calc(var(--pad-sidebar) + var(--studio-bar));
   /* The column a page's content and the prompt share, and the inset beside
      it: a page scroller's own inset and the scrollbar room it keeps. */
   --studio-column: calc(var(--content-width) + var(--space) * 25.5);
@@ -52,21 +54,24 @@ body {
   background: var(--win);
 }
 
-.is-library {
-  gap: var(--gap-stack);
-  padding-top: calc((var(--studio-bar) - var(--h-ctl)) / 2);
+.is-library-top {
+  display: flex;
+  flex: none;
+  align-items: center;
+  height: var(--studio-bar);
 }
 
 .is-library-head {
   display: flex;
   flex-direction: column;
-  gap: var(--gap-stack);
+  gap: var(--gap-row);
   padding-right: var(--pad-sidebar);
 }
 
 .is-library-nav {
   display: flex;
   flex-direction: column;
+  gap: calc(var(--space) * 0.5);
 }
 
 .is-nav-row {
@@ -102,7 +107,7 @@ body {
 }
 
 .is-day {
-  padding: calc(var(--space) * 3) calc(var(--space) * 2.5) var(--gap-inline);
+  padding: var(--gap-row) calc(var(--space) * 2.5) var(--gap-inline);
   color: var(--dim);
   font-size: var(--fs-cap);
 }
@@ -179,8 +184,8 @@ body {
   flex: none;
   align-items: center;
   gap: var(--gap-inline);
-  height: var(--studio-bar);
-  padding: 0 calc(var(--space) * 3.5);
+  height: var(--studio-head);
+  padding: var(--pad-sidebar) calc(var(--space) * 3.5) 0;
   border-bottom: var(--bw) solid var(--line);
   box-sizing: border-box;
 }
@@ -524,7 +529,7 @@ body {
 @media (width < 900px) {
   .is-side {
     position: absolute;
-    top: var(--studio-bar);
+    top: var(--studio-head);
     bottom: 0;
     left: 0;
     z-index: 2;
