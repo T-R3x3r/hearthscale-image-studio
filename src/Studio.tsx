@@ -51,7 +51,6 @@ import { ComparePage, type Column } from './ComparePage';
 type Page = 'studio' | 'compare';
 
 interface Prefs {
-  model: string | null;
   shape: ShapeId;
   size: SizeId;
   style: string | null;
@@ -59,7 +58,7 @@ interface Prefs {
   compare: string[];
 }
 
-const PREFS: Prefs = { model: null, shape: 'square', size: 'medium', style: null, count: 1, compare: [] };
+const PREFS: Prefs = { shape: 'square', size: 'medium', style: null, count: 1, compare: [] };
 
 const LABELS: Record<Action | 'compare', string> = {
   make: 'Make',
@@ -234,6 +233,7 @@ export function Studio() {
   const [deleting, setDeleting] = useState<Picture | null>(null);
   const [helping, setHelping] = useState(false);
   const [starting, setStarting] = useState(false);
+  const [resubmit, setResubmit] = useState(false);
   const [opened, setOpened] = useState(false);
   const shownBlob = useRef<{ path: string; blob: Blob } | null>(null);
   const shownBefore = useRef<Picture | null>(null);
@@ -296,6 +296,12 @@ export function Studio() {
   }, [refreshLibrary]);
 
   useEffect(() => setFolded(cramped), [cramped]);
+
+  useEffect(() => {
+    if (!resubmit) return;
+    setResubmit(false);
+    void submit();
+  }, [resubmit]);
 
   useEffect(
     () =>
@@ -370,11 +376,7 @@ export function Studio() {
   });
 
   const imageCards = models?.image ?? [];
-  const model: ModelCard | null =
-    imageCards.find((card) => card.id === prefs.model) ??
-    imageCards.find((card) => card.id === models?.chosen) ??
-    imageCards[0] ??
-    null;
+  const model: ModelCard | null = imageCards.find((card) => card.id === models?.chosen) ?? null;
   const abilities = abilitiesOf(model ?? undefined);
   const upscaler = models?.upscale.find((card) => card.id === models.upscaleChosen) ?? models?.upscale[0] ?? null;
   const chat = models?.chat ?? null;
@@ -429,6 +431,14 @@ export function Studio() {
     if (!model || !ready || starting) return;
     setStarting(true);
     try {
+      // A pick in the model slot changes the app's model in Hearthscale, so
+      // a run reads the choice first and starts on the model the picker shows.
+      const { chosen } = await call('hearthscale/models/list', { kind: 'image' });
+      if ((chosen.image?.card ?? null) !== models?.chosen) {
+        await refreshModels();
+        setResubmit(true);
+        return;
+      }
       if (action === 'compare') return await compare();
       if (action === 'make') return await make();
       await change(action);
@@ -783,6 +793,9 @@ export function Studio() {
   const columns: Column[] = compareRuns.map(({ run, picture }) => ({ run, picture, live: live.get(run.id) ?? null }));
   const fold = tips('fold', folded ? 'Show the library' : 'Hide the library');
   const lightboxItems = strip.length ? strip : shown ? [shown] : [];
+  const lightbox = large !== null && lightboxItems.length > 0;
+  /** A part the view draws over the prompt's footer, under which the model slot lies. */
+  const covering = lightbox || !!deleting || !!toast || (cramped && !folded);
   const suggestedImage = models?.downloading.find((card) => card.kind === 'image') ?? models?.absentImage[0] ?? null;
   const stageProps: StageProps = {
     narrow,
@@ -837,6 +850,10 @@ export function Studio() {
   const away = () => {
     if (cramped) setFolded(true);
   };
+
+  useEffect(() => {
+    void call('hearthscale/ui/cover', { covered: covering });
+  }, [covering]);
 
   return (
     <div
@@ -943,7 +960,6 @@ export function Studio() {
             current={model?.id ?? null}
             columns={columns}
             onShow={(picture) => (setPage('studio'), void show(picture))}
-            onUse={(card) => setPrefs({ model: card })}
             onCancel={(run) => void cancelRun(run)}
           />
         )}
@@ -973,10 +989,7 @@ export function Studio() {
             onDropReference={(id) => setReferences((before) => before.filter((r) => r.id !== id))}
             onOpenFile={(file) => void openFile(file)}
             canAddReference={editing && abilities.edit && references.length < 9}
-            models={imageCards}
-            model={model}
             abilities={abilities}
-            onModel={(id) => setPrefs({ model: id })}
             shape={prefs.shape}
             onShape={(shape) => setPrefs({ shape })}
             size={prefs.size}
@@ -1009,7 +1022,7 @@ export function Studio() {
           />
         </div>
       </main>
-      {large !== null && lightboxItems.length > 0 && (
+      {lightbox && (
         <Lightbox
           items={lightboxItems.map((p) => ({
             src: fileUrl(p.path),

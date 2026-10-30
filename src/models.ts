@@ -92,8 +92,3 @@ export function onDownload(
 ) {
   return on('hearthscale/models/download', ({ download }) => fn(download));
 }
-
-export function gigabytes(bytes: number | undefined): string {
-  if (!bytes) return '';
-  return `${(bytes / 1e9).toFixed(bytes >= 1e10 ? 0 : 1)} GB`;
-}

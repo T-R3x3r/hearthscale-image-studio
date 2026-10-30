@@ -1,5 +1,4 @@
-import { useRef, useState, type MouseEvent, type ReactNode } from 'react';
-import type { ModelCard } from '@hearthscale/app';
+import { useLayoutEffect, useRef, useState, type MouseEvent, type ReactNode } from 'react';
 import {
   Button,
   Icon,
@@ -16,10 +15,9 @@ import {
   type IconName,
   type MenuAnchor,
 } from '@hearthscale/app-ui';
-import { fileUrl } from './bridge';
+import { call, fileUrl } from './bridge';
 import type { Picture } from './records';
 import type { Abilities } from './models';
-import { gigabytes } from './models';
 import { SHAPES, SIZES, STYLES, type ShapeId, type SizeId } from './recipes';
 
 export interface Advanced {
@@ -75,6 +73,39 @@ function Menu(props: { label: string; value: string; icon?: ReactNode; children:
   );
 }
 
+/** Where Hearthscale draws its picker of the app's image model. The place
+ *  takes the footer's free room, so the picker, drawn at its left, follows
+ *  the other controls whatever the length of the model's name. */
+function ModelSlot() {
+  const place = useRef<HTMLSpanElement>(null);
+  const reserved = useRef('');
+  const reserve = () => {
+    const box = place.current!.getBoundingClientRect();
+    const insets = {
+      left: box.left,
+      top: box.top,
+      right: window.innerWidth - box.right,
+      bottom: window.innerHeight - box.bottom,
+    };
+    const key = JSON.stringify(insets);
+    if (key === reserved.current) return;
+    reserved.current = key;
+    void call('hearthscale/ui/slots', { slots: [{ id: 'model', kind: 'model', model: 'image', insets }] });
+  };
+  useLayoutEffect(reserve);
+  useLayoutEffect(() => {
+    const observer = new ResizeObserver(() => reserve());
+    observer.observe(place.current!);
+    observer.observe(document.documentElement);
+    return () => {
+      observer.disconnect();
+      reserved.current = '';
+      void call('hearthscale/ui/slots', { slots: [] });
+    };
+  }, []);
+  return <span ref={place} className="is-model-slot" />;
+}
+
 export function PromptBar(props: {
   words: string;
   onWords: (words: string) => void;
@@ -90,10 +121,7 @@ export function PromptBar(props: {
   onDropReference: (id: string) => void;
   onOpenFile: (file: File) => void;
   canAddReference: boolean;
-  models: ModelCard[];
-  model: ModelCard | null;
   abilities: Abilities;
-  onModel: (id: string) => void;
   shape: ShapeId;
   onShape: (shape: ShapeId) => void;
   size: SizeId;
@@ -198,27 +226,6 @@ export function PromptBar(props: {
               if (picked) props.onOpenFile(picked);
             }}
           />
-          {!props.comparing && (
-            <Menu
-              label="Image model"
-              value={props.model?.label ?? 'No image model'}
-              icon={<Icon name="image-ai-line" size={14} />}
-            >
-              {(close) => (
-                <>
-                  {props.models.map((card) => (
-                    <MItem
-                      key={card.id}
-                      label={card.label}
-                      chip={gigabytes(card.sizeBytes)}
-                      checked={card.id === props.model?.id}
-                      onClick={() => (close(), props.onModel(card.id))}
-                    />
-                  ))}
-                </>
-              )}
-            </Menu>
-          )}
           {!props.source && (
             <>
               <Menu
@@ -330,7 +337,7 @@ export function PromptBar(props: {
               />
             </div>
           )}
-          <span className="hs-composer-fill" />
+          {props.comparing ? <span className="hs-composer-fill" /> : <ModelSlot />}
           <span className="is-prompt-end">
             {props.onDescribe && (
               <span {...describe.hover} className="is-tipwrap">

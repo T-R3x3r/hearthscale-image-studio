@@ -1,6 +1,16 @@
 import type { ModelCard } from '@hearthscale/app';
-import { Button, Chip, Icon, Meter, Notice, StatusWord, useFloatingTips } from '@hearthscale/app-ui';
-import { assetUrl, fileUrl } from './bridge';
+import {
+  Button,
+  Chip,
+  Icon,
+  Meter,
+  ModelAvatar,
+  Notice,
+  PublisherPicturesContext,
+  StatusWord,
+  useFloatingTips,
+} from '@hearthscale/app-ui';
+import { assetUrl, fileUrl, publisherPicture } from './bridge';
 import { nameOf, type Picture, type Run } from './records';
 import type { Live } from './runs';
 
@@ -25,7 +35,6 @@ export function ComparePage(props: {
   current: string | null;
   columns: Column[];
   onShow: (picture: Picture) => void;
-  onUse: (card: string) => void;
   onCancel: (run: string) => void;
 }) {
   const tips = useFloatingTips('top');
@@ -34,84 +43,80 @@ export function ComparePage(props: {
     else if (props.picked.length < COMPARE_MOST) props.onPick([...props.picked, id]);
   };
   return (
-    <div className="hs-scroll hs-settings-scroll is-page">
-      <main className="is-compare-page">
-        {props.models.length < 2 ? (
-          <Notice>Compare needs at least two image models.</Notice>
-        ) : (
-          <div className="is-compare-pick">
-            {props.models.map((card) => (
-              <Chip key={card.id} selected={props.picked.includes(card.id)} onClick={() => flip(card.id)}>
-                {card.label}
-              </Chip>
-            ))}
-          </div>
-        )}
-        {props.columns.length > 0 && (
-          <>
-            <div className="is-compare-prompt">{nameOf(props.columns[0].run.prompt)}</div>
-            <div
-              className="is-compare-grid"
-              style={{ gridTemplateColumns: `repeat(${props.columns.length}, minmax(0, var(--compare-column)))` }}
-            >
-              {props.columns.map(({ run, picture, live }) => (
-                <div key={run.id} className="is-compare-column">
-                  <div className="is-compare-head">
-                    <span className="is-compare-name">{run.label}</span>
-                    <span className="is-compare-time">{seconds(run) ?? ''}</span>
-                  </div>
-                  <div className="is-compare-cell">
-                    {picture ? (
-                      <button className="is-compare-picture" onClick={() => props.onShow(picture)}>
-                        <img src={fileUrl(picture.path)} alt={run.prompt} />
-                      </button>
-                    ) : live ? (
-                      <div className="is-compare-making">
-                        {live.preview ? (
-                          <img src={assetUrl(live.preview)} alt="The picture so far" />
-                        ) : (
-                          <Icon name="image-ai-line" size={28} className="is-making-mark" />
-                        )}
-                        <Meter value={live.fraction} label={`Progress of ${run.label}`} />
-                        <Button variant="ghost" size="sm" onClick={() => props.onCancel(run.id)}>
-                          Cancel
-                        </Button>
-                      </div>
-                    ) : (
-                      (() => {
-                        const why = tips(run.id, run.error ?? undefined);
-                        return (
-                          <span {...why.hover} className="is-tipwrap">
-                            {run.status === 'cancelled' ? (
-                              <StatusWord tone="dim">Cancelled</StatusWord>
-                            ) : (
-                              <StatusWord tone="bad">Failed</StatusWord>
-                            )}
-                            {why.tip}
-                          </span>
-                        );
-                      })()
-                    )}
-                  </div>
-                  {picture &&
-                    (run.model === props.current ? (
-                      <StatusWord tone="ok">In use</StatusWord>
-                    ) : (
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        icon={<Icon name="check-line" size={14} />}
-                        onClick={() => props.onUse(run.model)}
-                      >
-                        Use this model
-                      </Button>
-                    ))}
-                </div>
+    <PublisherPicturesContext value={publisherPicture}>
+      <div className="hs-scroll hs-settings-scroll is-page">
+        <main className="is-compare-page">
+          {props.models.length < 2 ? (
+            <Notice>Compare needs at least two image models.</Notice>
+          ) : (
+            <div className="is-compare-pick">
+              {props.models.map((card) => (
+                <Chip key={card.id} selected={props.picked.includes(card.id)} onClick={() => flip(card.id)}>
+                  {card.label}
+                </Chip>
               ))}
             </div>
-          </>
-        )}
-      </main>
-    </div>
+          )}
+          {props.columns.length > 0 && (
+            <>
+              <div className="is-compare-prompt">{nameOf(props.columns[0].run.prompt)}</div>
+              <div
+                className="is-compare-grid"
+                style={{ gridTemplateColumns: `repeat(${props.columns.length}, minmax(0, var(--compare-column)))` }}
+              >
+                {props.columns.map(({ run, picture, live }) => {
+                  const card = props.models.find((c) => c.id === run.model);
+                  return (
+                    <div key={run.id} className="is-compare-column">
+                      <div className="is-compare-head">
+                        <span className="is-compare-model">
+                          {card?.identity && <ModelAvatar identity={card.identity} server={card.provider} size={16} />}
+                          <span className="is-compare-name">{run.label}</span>
+                        </span>
+                        <span className="is-compare-time">{seconds(run) ?? ''}</span>
+                      </div>
+                      <div className="is-compare-cell">
+                        {picture ? (
+                          <button className="is-compare-picture" onClick={() => props.onShow(picture)}>
+                            <img src={fileUrl(picture.path)} alt={run.prompt} />
+                          </button>
+                        ) : live ? (
+                          <div className="is-compare-making">
+                            {live.preview ? (
+                              <img src={assetUrl(live.preview)} alt="The picture so far" />
+                            ) : (
+                              <Icon name="image-ai-line" size={28} className="is-making-mark" />
+                            )}
+                            <Meter value={live.fraction} label={`Progress of ${run.label}`} />
+                            <Button variant="ghost" size="sm" onClick={() => props.onCancel(run.id)}>
+                              Cancel
+                            </Button>
+                          </div>
+                        ) : (
+                          (() => {
+                            const why = tips(run.id, run.error ?? undefined);
+                            return (
+                              <span {...why.hover} className="is-tipwrap">
+                                {run.status === 'cancelled' ? (
+                                  <StatusWord tone="dim">Cancelled</StatusWord>
+                                ) : (
+                                  <StatusWord tone="bad">Failed</StatusWord>
+                                )}
+                                {why.tip}
+                              </span>
+                            );
+                          })()
+                        )}
+                      </div>
+                      {picture && run.model === props.current && <StatusWord tone="ok">In use</StatusWord>}
+                    </div>
+                  );
+                })}
+              </div>
+            </>
+          )}
+        </main>
+      </div>
+    </PublisherPicturesContext>
   );
 }

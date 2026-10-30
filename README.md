@@ -24,8 +24,10 @@ Your pictures stay on your computer, in Image Studio's own folder.
 
 ## What it needs
 
-An image model on a Hearthscale Server. When there is none, Image Studio
-offers the one your Server suggests, and the Server downloads it. A chat model is optional: it improves your words and describes
-a picture for you.
+An image model on a Hearthscale Server. Choose it in the model picker of the
+prompt, which also lists the models your Servers can download; Image Studio's
+page in Settings shows the same choice. When there is none, Image Studio
+offers the one your Server suggests, and the Server downloads it. A chat model
+is optional: it improves your words and describes a picture for you.
 
 Image Studio is free.

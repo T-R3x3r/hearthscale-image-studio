@@ -69,6 +69,11 @@ export function fileUrl(path: string): string {
   return hostContext()['hearthscale/dataBytes']!.url + path.split('/').map(encodeURIComponent).join('/');
 }
 
+/** The address of the picture a model's Server keeps of the model's publisher. */
+export function publisherPicture(server: string | undefined, owner: string): string | undefined {
+  return server && `${hostContext()['hearthscale/publishers']!.url}${server}/${owner}`;
+}
+
 /** The address an asset of the app streams from. */
 export function assetUrl(asset: string): string {
   return hostContext()['hearthscale/assetBytes']!.url + asset;

@@ -36,6 +36,14 @@ body {
   gap: var(--space);
 }
 
+/* The model slot: the footer's free room, at least the slot's least size,
+   as high as the footer's other pickers. */
+.is-model-slot {
+  flex: 1;
+  min-width: calc(var(--space) * 30);
+  height: calc(var(--space) * 6.5);
+}
+
 .is-tool:disabled {
   background: none;
   box-shadow: none;
@@ -485,6 +493,13 @@ body {
   gap: var(--gap-inline);
   width: 100%;
   font-size: var(--fs-row);
+}
+
+.is-compare-model {
+  display: flex;
+  align-items: center;
+  gap: var(--gap-inline);
+  min-width: 0;
 }
 
 .is-compare-name {
