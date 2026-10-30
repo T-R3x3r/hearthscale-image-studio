@@ -20,6 +20,8 @@ body {
 }
 
 .is-studio {
+  /* The height of the top bar, whose band the library's first row shares. */
+  --studio-bar: calc(var(--space) * 9.5);
   position: relative;
   display: flex;
   height: 100%;
@@ -56,6 +58,7 @@ body {
 
 .is-library {
   gap: var(--gap-stack);
+  padding-top: calc((var(--studio-bar) - var(--h-ctl)) / 2);
 }
 
 .is-library-head {
@@ -163,7 +166,7 @@ body {
   flex: none;
   align-items: center;
   gap: var(--gap-inline);
-  height: calc(var(--space) * 9.5);
+  height: var(--studio-bar);
   padding: 0 calc(var(--space) * 3.5);
   border-bottom: var(--bw) solid var(--line);
   box-sizing: border-box;
@@ -529,7 +532,7 @@ body {
 @media (width < 900px) {
   .is-side {
     position: absolute;
-    top: calc(var(--space) * 9.5);
+    top: var(--studio-bar);
     bottom: 0;
     left: 0;
     z-index: 2;
