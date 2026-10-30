@@ -4,21 +4,13 @@ import {
   PostMessageTransport,
   type McpUiHostContext,
 } from '@modelcontextprotocol/ext-apps';
-import { extensionCall } from '@hearthscale/app/view';
-import type { ViewExtensionNotification, ViewHostContext, ViewHostMethods } from '@hearthscale/app';
+import { hostCall } from '@hearthscale/app/view';
+import type { ViewExtensionNotification, ViewHostContext } from '@hearthscale/app';
 
 export const app = new App({ name: 'Image Studio', version: '0.1.0' }, {}, { autoResize: false });
 
-/** A typed `hearthscale/*` extension call. */
-export const call = extensionCall(app);
-
-/** A typed `hearthscale/ui/*` request every view may make. */
-export function host<M extends keyof ViewHostMethods>(
-  method: M,
-  params: ViewHostMethods[M]['params'],
-): Promise<ViewHostMethods[M]['result']> {
-  return app.request({ method, params } as never, McpUiMessageResultSchema) as never;
-}
+/** A typed call of every `hearthscale/*` method the view may make. */
+export const call = hostCall(app);
 
 /** Saves a picture where the person picks, from a click. */
 export function download(name: string, blob: Blob): Promise<{ isError?: boolean }> {

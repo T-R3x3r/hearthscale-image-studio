@@ -22,13 +22,13 @@ const backend: Backend = {
         model: string;
         input: Record<string, unknown>;
       };
-      const job = await ctx.jobs!.submit({
+      const job = await ctx.jobs.submit({
         kind,
         model,
         input: request,
         save: { root: 'data', path: folderOf(run) },
       });
-      await ctx.db!.exec('UPDATE runs SET job = ? WHERE id = ?', [job.id, run]);
+      await ctx.db.exec('UPDATE runs SET job = ? WHERE id = ?', [job.id, run]);
       return { job };
     },
 
@@ -54,8 +54,8 @@ const backend: Backend = {
       const { asset, run } = input as { asset: string; run: string };
       const path = `${folderOf(run)}/image.png`;
       try {
-        await ctx.fs!.mkdir({ root: 'data', path: folderOf(run) });
-        await ctx.fs!.export(asset, { root: 'data', path });
+        await ctx.fs.mkdir({ root: 'data', path: folderOf(run) });
+        await ctx.fs.export(asset, { root: 'data', path });
       } finally {
         await ctx.assets.release(asset);
       }
@@ -65,10 +65,10 @@ const backend: Backend = {
     async remove(input) {
       const { paths } = input as { paths: string[] };
       for (const path of paths) {
-        await ctx.fs!.remove({ root: 'data', path });
+        await ctx.fs.remove({ root: 'data', path });
         const folder = path.slice(0, path.lastIndexOf('/'));
-        const left = await ctx.fs!.list({ root: 'data', path: folder });
-        if (left.files.length === 0 && left.dirs.length === 0) await ctx.fs!.remove({ root: 'data', path: folder });
+        const left = await ctx.fs.list({ root: 'data', path: folder });
+        if (left.files.length === 0 && left.dirs.length === 0) await ctx.fs.remove({ root: 'data', path: folder });
       }
       return { removed: paths.length };
     },

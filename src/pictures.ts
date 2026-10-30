@@ -1,4 +1,4 @@
-import { fileUrl, host } from './bridge';
+import { call, fileUrl } from './bridge';
 
 const sizes = new Map<string, Promise<{ width: number; height: number }>>();
 
@@ -42,7 +42,7 @@ function toPng(canvas: HTMLCanvasElement): Promise<Blob> {
 }
 
 export async function upload(name: string, blob: Blob): Promise<string> {
-  const { asset } = await host('hearthscale/ui/upload-file', { name, mediaType: 'image/png', blob });
+  const { asset } = await call('hearthscale/ui/upload-file', { name, mediaType: 'image/png', blob });
   return asset;
 }
 
