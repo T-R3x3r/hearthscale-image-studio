@@ -436,6 +436,12 @@ body {
   cursor: pointer;
 }
 
+/* What a run does, beside its progress, while the stage keeps its picture. */
+.is-strip-state {
+  color: var(--mut);
+  font-size: var(--fs-row);
+}
+
 .is-strip-item[data-making] {
   cursor: default;
 }

@@ -874,6 +874,9 @@ export function Studio() {
   /** A part the view draws over the prompt's footer, under which the model slot lies. */
   const covering = lightbox || !!deleting || (cramped && !folded);
   const suggestedImage = models?.downloading.find((card) => card.kind === 'image') ?? models?.absentImage[0] ?? null;
+  const liveLabel = stripRun
+    ? `${stripRun.action === 'make' ? 'Making' : stripRun.action === 'enlarge' ? 'Enlarging' : 'Changing'}…`
+    : '';
   const stageProps: StageProps = {
     narrow,
     compact: mainWidth < ROOMY,
@@ -890,7 +893,7 @@ export function Studio() {
     comparing,
     onStopCompare: () => setComparing(false),
     live: stripLive,
-    liveLabel: stripRun ? `${stripRun.action === 'make' ? 'Making' : 'Changing'}…` : '',
+    liveLabel,
     liveModel: stripRun?.label ?? '',
     noModel: !!models && imageCards.length === 0,
     unavailable: models?.unavailable ?? null,
@@ -1013,6 +1016,7 @@ export function Studio() {
                       <Meter value={stripLive.fraction} label="Progress" variant="ring" />
                     </div>
                   ))}
+                {stripLive && shown && <span className="is-strip-state">{liveLabel}</span>}
                 {stripLive ? (
                   <Button
                     variant="ghost"
