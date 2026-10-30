@@ -337,11 +337,16 @@ body {
   gap: var(--gap-inline);
 }
 
+/* A labelled slider is a group of its own: the row gap lies before its
+   label and after its slider, so its words stand as far from a chip's
+   words as two chips' words stand apart. */
 .is-bar-slider {
   width: calc(var(--space) * 48);
+  margin-right: var(--gap-row);
 }
 
 .is-bar-label {
+  margin-left: var(--gap-row);
   color: var(--mut);
   font-size: var(--fs-row);
 }
