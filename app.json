@@ -1,8 +1,8 @@
 {
   "$schema": "https://hearthscale.com/app.schema.json",
   "id": "image-studio",
-  "name": "Image Studio",
-  "version": "0.1.0",
+  "name": "Image studio",
+  "version": "0.1.1",
   "api": 6,
   "icon": { "light": "assets/icon-light.svg", "dark": "assets/icon-dark.svg" },
   "description": "Make and change pictures with the image models on this computer.",
@@ -22,7 +22,7 @@
     "cards": [
       {
         "title": "Pictures from words.",
-        "text": "Describe a picture, and Image Studio makes it. Every picture stays in your library.",
+        "text": "Describe a picture, and Image studio makes it. Every picture stays in your library.",
         "image": "assets/intro.png",
         "download": {
           "kind": "image",
@@ -65,7 +65,7 @@
     {
       "id": "studio",
       "kind": "view",
-      "title": "Image Studio",
+      "title": "Image studio",
       "entry": "views/studio.js",
       "placements": ["rail", "tab"]
     }

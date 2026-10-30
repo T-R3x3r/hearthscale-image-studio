@@ -1,6 +1,6 @@
-# Developing Image Studio
+# Developing Image studio
 
-`README.md` is the text the Marketplace shows for Image Studio, so it is
+`README.md` is the text the Marketplace shows for Image studio, so it is
 written for the people who install it. This file is for the people who work
 on it.
 
@@ -62,7 +62,7 @@ The view shows a picture from the data folder's streamed address
 
 ## What a model can do
 
-Image Studio names no model. It reads the input schema each model card
+Image studio names no model. It reads the input schema each model card
 states (`jobs.image.input`) and offers only what that schema takes:
 
 | Field in the schema | What the person gets                                  |

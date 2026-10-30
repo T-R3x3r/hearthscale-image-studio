@@ -2,7 +2,7 @@ import { App, PostMessageTransport, type McpUiHostContext } from '@modelcontextp
 import { hostCall } from '@hearthscale/app/view';
 import type { ViewExtensionNotification, ViewHostContext } from '@hearthscale/app';
 
-export const app = new App({ name: 'Image Studio', version: '0.1.0' }, {}, { autoResize: false });
+export const app = new App({ name: 'Image studio', version: '0.1.1' }, {}, { autoResize: false });
 
 /** A typed call of every `hearthscale/*` method the view may make. */
 export const call = hostCall(app);
