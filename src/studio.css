@@ -266,6 +266,22 @@ body {
   background: var(--card);
 }
 
+/* The picture opens large on a press, while no tool paints or extends it. */
+.is-frame-open {
+  position: absolute;
+  inset: 0;
+  padding: 0;
+  border: 0;
+  border-radius: inherit;
+  background: none;
+  cursor: zoom-in;
+}
+
+.is-frame-open:focus-visible {
+  outline: calc(var(--bw) * 2) solid var(--mut);
+  outline-offset: calc(var(--bw) * -4);
+}
+
 .is-frame[data-extend='true'] {
   background: repeating-linear-gradient(
     45deg,
@@ -579,7 +595,7 @@ body {
   padding: 0;
   border: 0;
   background: none;
-  cursor: zoom-in;
+  cursor: pointer;
 }
 
 .is-compare-picture img,

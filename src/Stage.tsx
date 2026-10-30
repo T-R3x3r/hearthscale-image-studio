@@ -300,6 +300,9 @@ export function Stage(props: StageProps) {
               : undefined
           }
         />
+        {props.actions && props.tool === 'none' && !props.painted && (
+          <button className="is-frame-open" aria-label="View large" onClick={props.actions.large} />
+        )}
         {(props.tool === 'brush' || props.painted) && isSource && (
           <Brush
             strokes={props.strokes}
