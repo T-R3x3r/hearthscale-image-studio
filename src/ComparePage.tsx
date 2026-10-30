@@ -52,7 +52,7 @@ export function ComparePage(props: {
             <div className="is-compare-prompt">{props.columns[0].run.prompt}</div>
             <div
               className="is-compare-grid"
-              style={{ gridTemplateColumns: `repeat(${props.columns.length}, minmax(0, 1fr))` }}
+              style={{ gridTemplateColumns: `repeat(${props.columns.length}, minmax(0, var(--compare-column)))` }}
             >
               {props.columns.map(({ run, picture, live }) => (
                 <div key={run.id} className="is-compare-column">

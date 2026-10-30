@@ -294,9 +294,11 @@ export function Studio() {
         if (moved.state !== 'downloading') {
           if (moved.state !== 'ready' && moved.reason) setProblem(moved.reason);
           void refreshModels();
+        } else if (!models?.downloading.some((card) => card.id === moved.card)) {
+          void refreshModels();
         }
       }),
-    [refreshModels],
+    [refreshModels, models],
   );
 
   useEffect(() => {

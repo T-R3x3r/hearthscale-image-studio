@@ -130,6 +130,7 @@ export function ModelsPage(props: {
                     <div className="is-model-meter">
                       <Meter value={share} label={`How much of ${card.label} has arrived`} />
                     </div>
+                    <span className="is-model-sub">{Math.round(share * 100)}%</span>
                   </Row>
                 );
               })}

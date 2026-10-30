@@ -512,6 +512,7 @@ button.is-model-name {
 }
 
 .is-compare-grid {
+  --compare-column: calc(var(--space) * 100);
   display: grid;
   gap: var(--gap-row);
 }
