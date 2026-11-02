@@ -57,6 +57,14 @@ body {
   height: calc(var(--space) * 6.5);
 }
 
+/* A footer too short for its controls at full width shows each picker
+   by its icon alone. The name keeps its place at no width, so the
+   footer still measures the room the whole name takes. */
+.is-prompt-row[data-short='true'] .hs-model-trigger-name {
+  max-width: 0;
+  margin-right: calc(var(--gap-inline) * -1);
+}
+
 .is-tool:disabled {
   background: none;
   box-shadow: none;
