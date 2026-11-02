@@ -272,7 +272,8 @@ export function Library(props: {
       if (!selected.has(picture.id)) return props.onSelect([...props.selected, picture.id], picture);
       const left = props.selected.filter((id) => id !== picture.id);
       if (left.length === 0) return;
-      const show = picture.id === props.shown ? props.pictures.find((p) => p.id === left[left.length - 1])! : null;
+      const show =
+        picture.id === props.shown ? (props.pictures.find((p) => p.id === left[left.length - 1]) ?? null) : null;
       return props.onSelect(left, show);
     }
     anchor.current = picture.id;

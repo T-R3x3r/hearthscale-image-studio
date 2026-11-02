@@ -427,6 +427,13 @@ export function Studio() {
   }, [shown?.id]);
 
   useEffect(() => {
+    setSelected((before) => {
+      const kept = before.filter((id) => pictures.some((p) => p.id === id));
+      return kept.length === before.length ? before : kept;
+    });
+  }, [pictures]);
+
+  useEffect(() => {
     setPair(null);
     if (selected.length !== 2) return;
     const two = selected.map((id) => pictures.find((p) => p.id === id));
