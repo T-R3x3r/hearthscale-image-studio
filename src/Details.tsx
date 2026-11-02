@@ -5,8 +5,6 @@ import { sizeOf } from './pictures';
 import { STYLES } from './recipes';
 import { getRun, nameOf, type Picture, type Run } from './records';
 
-/** What a picture was made from, in the words of the prompt's own fields,
- *  in a popover beside the element it opens from. */
 export function Details(props: {
   picture: Picture;
   anchor: HTMLElement;

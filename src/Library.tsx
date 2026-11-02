@@ -60,7 +60,6 @@ function rowsOf(pictures: Picture[], locale: string): Row[] {
   return rows;
 }
 
-/** Where each picture sits in the rows: its row and its column. */
 function placesOf(rows: Row[]): Map<string, { row: number; column: number }> {
   const places = new Map<string, { row: number; column: number }>();
   rows.forEach((row, index) => {
@@ -69,19 +68,14 @@ function placesOf(rows: Row[]): Map<string, { row: number; column: number }> {
   return places;
 }
 
-/** What the library's menu does with the pictures it opens on. */
 export interface LibraryActions {
-  /** The actions of one picture, as the stage offers them. */
   of: (picture: Picture) => PictureActions;
-  /** Shows a picture large, among the pictures of the library. */
   large: (picture: Picture) => void;
-  /** Compares the two selected pictures, where they have one shape. */
   compare: (() => void) | null;
   favourite: (pictures: Picture[], on: boolean) => void;
   remove: (pictures: Picture[]) => void;
 }
 
-/** The rows of the menu of the selected pictures. */
 function PictureMenu(props: {
   pictures: Picture[];
   actions: LibraryActions;
@@ -195,7 +189,6 @@ export function Library(props: {
   pictures: Picture[];
   locale: string;
   shown: string | null;
-  /** The ids of the selected pictures, the shown one among them. */
   selected: string[];
   words: string;
   favourites: boolean;
@@ -203,9 +196,7 @@ export function Library(props: {
   actions: LibraryActions;
   onWords: (words: string) => void;
   onFavourites: (on: boolean) => void;
-  /** Selects pictures, and shows one of them where `show` names it. */
   onSelect: (ids: string[], show: Picture | null) => void;
-  /** A plain click chose one picture to look at. */
   onOpen: () => void;
   onNew: () => void;
   onPage: (page: 'studio' | 'compare') => void;
@@ -213,23 +204,17 @@ export function Library(props: {
   const rows = useMemo(() => rowsOf(props.pictures, props.locale), [props.pictures, props.locale]);
   const places = useMemo(() => placesOf(rows), [rows]);
   const list = useRef<VirtualListHandle>(null);
-  /** The picture a Shift press selects from. */
   const anchor = useRef<string | null>(null);
-  /** The pictures a delete from the library asked for: once they have
-   *  left the library and the focus left with them, the shown picture
-   *  takes the focus. */
   const refocus = useRef<string[] | null>(null);
   const [menu, setMenu] = useState<{ at: MenuAnchor; pictures: Picture[] } | null>(null);
   const [details, setDetails] = useState<{ picture: Picture; at: HTMLElement } | null>(null);
   const selected = new Set(props.selected);
   const chosen = () => props.pictures.filter((p) => selected.has(p.id));
-  /** The one picture the keyboard reaches with Tab: the shown one, else the first. */
   const current = places.has(props.shown ?? '') ? props.shown : (props.pictures[0]?.id ?? null);
 
   const thumbOf = (id: string) => document.querySelector<HTMLElement>(`[data-picture="${id}"]`);
 
-  /** Scrolls a picture into sight and gives it the keyboard focus, once the
-   *  list has drawn its row. */
+  /** Retries until the virtual list draws the row. */
   const focus = (id: string) => {
     const place = places.get(id);
     if (!place) return;
@@ -257,7 +242,6 @@ export function Library(props: {
     }
   });
 
-  /** The pictures from the anchor to `to`, in the library's order. */
   const range = (to: Picture) => {
     const from = props.pictures.findIndex((p) => p.id === (anchor.current ?? props.shown));
     const end = props.pictures.findIndex((p) => p.id === to.id);
@@ -286,7 +270,6 @@ export function Library(props: {
     setMenu({ at: { key: picture.id, element }, pictures });
   };
 
-  /** The picture an arrow key moves to from `picture`. */
   const neighbour = (picture: Picture, key: string): Picture | null => {
     const index = props.pictures.findIndex((p) => p.id === picture.id);
     if (key === 'ArrowLeft') return props.pictures[index - 1] ?? null;

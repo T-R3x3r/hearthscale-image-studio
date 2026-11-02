@@ -241,7 +241,6 @@ export interface StageProps {
   picture: Picture | null;
   size: { width: number; height: number } | null;
   source: Picture | null;
-  /** The picture the shown one is compared with, and the words over each one's corner. */
   comparing: { before: Picture; beforeName: string; afterName: string } | null;
   onStopCompare: () => void;
   live: Live | null;

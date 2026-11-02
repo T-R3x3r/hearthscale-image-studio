@@ -47,7 +47,6 @@ body {\r
   color: var(--dim);\r
 }\r
 \r
-/* The footer's end keeps its whole width at the right of the row. */\r
 .is-prompt-end {\r
   flex: none;\r
   display: flex;\r
@@ -57,17 +56,14 @@ body {\r
 }\r
 \r
 /* The model slot: the footer's free room, as high as the footer's other\r
-   pickers, and never narrower than the least width Hearthscale draws a\r
-   model slot at. In a short row the pickers' names give way instead. */\r
+   pickers, and no narrower than Hearthscale's least model slot. */\r
 .is-model-slot {\r
   flex: 1;\r
   min-width: calc(var(--space) * 30);\r
   height: calc(var(--space) * 6.5);\r
 }\r
 \r
-/* A footer too short for its controls at full width shows each picker\r
-   by its icon alone. The name keeps its place at no width, so the\r
-   footer still measures the room the whole name takes. */\r
+/* Width 0, not display: none, so useShortRow still measures the name. */\r
 .is-prompt-row[data-short='true'] .hs-model-trigger-name {\r
   max-width: 0;\r
   margin-right: calc(var(--gap-inline) * -1);\r

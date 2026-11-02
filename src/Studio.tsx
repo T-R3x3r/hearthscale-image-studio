@@ -253,7 +253,6 @@ export function Studio() {
   const [shownFrom, setShownFrom] = useState<Picture | null>(null);
   const [comparing, setComparing] = useState<StageProps['comparing']>(null);
   const [selected, setSelected] = useState<string[]>([]);
-  /** The two selected pictures, earlier first, where they have one shape. */
   const [pair, setPair] = useState<[Picture, Picture] | null>(null);
   const [stripRun, setStripRun] = useState<Run | null>(null);
   const [strip, setStrip] = useState<Picture[]>([]);
@@ -526,9 +525,7 @@ export function Studio() {
     return action === 'fill' ? 'Write what to put there' : 'Write what you want to see';
   })();
 
-  /** Starts a run with those of `loras` that are installed and fit its
-   *  model, and puts it on the stage while it makes; `again` starts the
-   *  same run anew if this one fails. */
+  /** `again` restarts the run if it fails. */
   async function begin(run: Run, input: Record<string, unknown>, again: () => Promise<unknown>, loras: Lora[]) {
     const card = imageCards.find((c) => c.id === run.model);
     const used = card ? fitting(card, loras, models?.adapters ?? []) : [];
@@ -857,7 +854,6 @@ export function Studio() {
     }
   }
 
-  /** Shows the folder of the picture's run in the system's file manager. */
   async function reveal(picture: Picture) {
     try {
       await call('openai/files/open', { path: dataPath(picture.path.slice(0, picture.path.lastIndexOf('/'))) });
@@ -899,7 +895,6 @@ export function Studio() {
     await refreshLibrary();
   }
 
-  /** What the person can do with a picture, on the stage or from the library's menu. */
   const actionsFor = (picture: Picture): PictureActions => ({
     edit:
       abilities.change || abilities.edit

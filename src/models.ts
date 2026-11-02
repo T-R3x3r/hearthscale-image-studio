@@ -27,7 +27,6 @@ export interface Abilities {
   /** The most pictures one job draws. */
   count: number;
   strength: number;
-  /** Draws with LoRAs, each with its weight. */
   loras: boolean;
 }
 
@@ -51,20 +50,16 @@ export function abilitiesOf(card: ModelCard | undefined): Abilities {
   };
 }
 
-/** A LoRA the person turned on, with how strongly it applies. */
 export interface Lora {
   id: string;
   weight: number;
 }
 
-/** A LoRA installed on a Server, with how strongly a job applies it. */
 export interface Fitted {
   adapter: ModelCard;
   weight: number;
 }
 
-/** The LoRAs of `on` that are installed and fit an image model, each with
- *  its card; none where the model draws with no LoRAs. */
 export function fitting(card: ModelCard, on: Lora[], adapters: ModelCard[]): Fitted[] {
   if (!abilitiesOf(card).loras) return [];
   return on.flatMap((lora) => {
@@ -73,8 +68,6 @@ export function fitting(card: ModelCard, on: Lora[], adapters: ModelCard[]): Fit
   });
 }
 
-/** An image job's input with its LoRAs: each named with its weight, and
- *  their trigger words before the prompt. */
 export function withLoras(input: Record<string, unknown>, used: Fitted[]): Record<string, unknown> {
   if (used.length === 0) return input;
   const triggers = used.flatMap(({ adapter }) => adapter.triggers ?? []);
@@ -100,7 +93,6 @@ export interface Models {
   absentImage: ModelCard[];
   absentUpscale: ModelCard[];
   downloading: ModelCard[];
-  /** The LoRAs on the person's Servers. */
   adapters: ModelCard[];
 }
 

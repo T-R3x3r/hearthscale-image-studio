@@ -29,7 +29,6 @@ export interface Run {
   finished: number | null;
 }
 
-/** A LoRA a run drew with: its card's id and name, and its weight. */
 export interface RunLora {
   id: string;
   label: string;
@@ -126,7 +125,6 @@ function runOf(row: Row): Run {
   };
 }
 
-/** A run's columns, its LoRAs in their order as one JSON array. */
 const RUN_COLUMNS = `r.*, (SELECT json_group_array(json_object('id', l.adapter, 'label', l.label, 'weight', l.weight))
   FROM (SELECT * FROM run_loras WHERE run = r.id ORDER BY idx) l) AS loras`;
 

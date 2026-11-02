@@ -49,8 +49,6 @@ function Tool(props: {
   );
 }
 
-/** A picker of the composer's footer. In a short row it shows its icon
- *  alone, and a tooltip names it. */
 function Menu(props: {
   label: string;
   value: string;
@@ -142,10 +140,7 @@ function ModelSlot() {
   return <span ref={place} className="is-model-slot" />;
 }
 
-/** Whether a row of controls is too short to hold them at full width:
- *  each picker with its whole name, and each part that takes the free
- *  room at its least width. The sum is the same whether the pickers show
- *  their names or not, so the answer holds once the names hide. */
+/** Counts each picker's whole name, so the result holds while names are hidden. */
 function useShortRow(row: RefObject<HTMLDivElement | null>): boolean {
   const [short, setShort] = useState(false);
   const measure = () => {
@@ -173,9 +168,6 @@ function useShortRow(row: RefObject<HTMLDivElement | null>): boolean {
   return short;
 }
 
-/** The LoRAs that fit the image model, each turned on or off with its
- *  weight, and the way to get more from the Server. In a short row the
- *  picker shows its icon alone, and a tooltip names it. */
 function Loras(props: { adapters: ModelCard[]; on: Lora[]; onChange: (on: Lora[]) => void; short: boolean }) {
   const [at, setAt] = useState<HTMLElement | null>(null);
   const tips = useFloatingTips('top');
@@ -270,7 +262,6 @@ export function PromptBar(props: {
   onCount: (count: number) => void;
   showCount: boolean;
   comparing: boolean;
-  /** The LoRAs that fit the image model. */
   adapters: ModelCard[];
   loras: Lora[];
   onLoras: (loras: Lora[]) => void;
