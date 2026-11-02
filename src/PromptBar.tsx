@@ -58,7 +58,7 @@ function Menu(props: { label: string; value: string; icon?: ReactNode; children:
         onClick={(e) => setAnchor(anchorFrom(props.label, e))}
       >
         {props.icon}
-        <span className="hs-model-trigger-name">{props.value}</span>
+        <span className="hs-model-trigger-name hs-cut">{props.value}</span>
         <Icon name="arrow-down-s-line" size={14} className="hs-model-trigger-chevron" />
       </button>
       {anchor && (
@@ -226,7 +226,7 @@ export function PromptBar(props: {
             }}
           />
         </div>
-        <div className="hs-composer-footer is-prompt-row">
+        <div className="hs-composer-footer">
           {!props.comparing && (!props.source || props.canAddReference) && (
             <span {...add.hover} className="is-tipwrap">
               <Tool
