@@ -10,7 +10,7 @@
   "categories": ["design"],
   "payment": "free",
   "environment": { "kind": "process" },
-  "uses": ["jobs", "models", "db", "store"],
+  "uses": ["jobs", "models", "db", "store", "files.open"],
   "models": {
     "image": { "required": true },
     "upscale": { "required": false },

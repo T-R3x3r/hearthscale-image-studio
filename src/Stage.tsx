@@ -42,12 +42,15 @@ export interface PictureActions {
   edit?: () => void;
   addToPrompt?: () => void;
   vary?: (how: 'little' | 'lot') => void;
+  more?: () => void;
   enlarge?: () => void;
   plainBackground?: () => void;
   compareSource?: () => void;
   favourite: () => void;
   save: () => void;
   copy: () => void;
+  copyPrompt?: () => void;
+  reveal: () => void;
   large: () => void;
   settings: () => void;
   remove: () => void;
@@ -237,8 +240,8 @@ export interface StageProps {
   picture: Picture | null;
   size: { width: number; height: number } | null;
   source: Picture | null;
-  sourceOf: Picture | null;
-  comparing: boolean;
+  /** The picture the shown one is compared with, and the words over each one's corner. */
+  comparing: { before: Picture; beforeName: string; afterName: string } | null;
   onStopCompare: () => void;
   live: Live | null;
   /** The task in progress, such as "Making…". */
@@ -291,12 +294,12 @@ export function Stage(props: StageProps) {
   const runsOn = tips('model', props.liveModel ? `With ${props.liveModel}` : undefined);
 
   let body;
-  if (props.comparing && picture && props.sourceOf) {
+  if (props.comparing && picture) {
     body = (
       <div className="is-compare-one" style={{ width: box.width }}>
         <PictureCompare
-          before={{ src: fileUrl(props.sourceOf.path), name: 'Before' }}
-          after={{ src: fileUrl(picture.path), name: 'After' }}
+          before={{ src: fileUrl(props.comparing.before.path), name: props.comparing.beforeName }}
+          after={{ src: fileUrl(picture.path), name: props.comparing.afterName }}
         />
       </div>
     );
@@ -741,6 +744,18 @@ export function StageBar(props: StageProps) {
             icon={<Icon name="file-copy-line" size={14} />}
             label="Copy"
             onClick={() => (setMenu(null), actions.copy())}
+          />
+          {actions.copyPrompt && (
+            <MItem
+              icon={<Icon name="file-text-line" size={14} />}
+              label="Copy prompt"
+              onClick={() => (setMenu(null), actions.copyPrompt!())}
+            />
+          )}
+          <MItem
+            icon={<Icon name="folder-open-line" size={14} />}
+            label="Show in folder"
+            onClick={() => (setMenu(null), actions.reveal())}
           />
           <MItem
             icon={<Icon name="restart-line" size={14} />}
