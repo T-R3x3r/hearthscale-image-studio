@@ -39,8 +39,9 @@ body {
   color: var(--dim);
 }
 
-/* Where the footer wraps, its end keeps to the right of its row. */
+/* The footer's end keeps its whole width at the right of the row. */
 .is-prompt-end {
+  flex: none;
   display: flex;
   align-items: center;
   gap: var(--space);
@@ -48,12 +49,20 @@ body {
 }
 
 /* The model slot: the footer's free room, as high as the footer's other
-   pickers, and wide enough for a usual model name; where the row has less
-   room, it moves to a row of its own. */
+   pickers, and never narrower than the least width Hearthscale draws a
+   model slot at. In a short row the pickers' names give way instead. */
 .is-model-slot {
   flex: 1;
-  min-width: calc(var(--space) * 60);
+  min-width: calc(var(--space) * 30);
   height: calc(var(--space) * 6.5);
+}
+
+/* A footer too short for its controls at full width shows each picker
+   by its icon alone. The name keeps its place at no width, so the
+   footer still measures the room the whole name takes. */
+.is-prompt-row[data-short='true'] .hs-model-trigger-name {
+  max-width: 0;
+  margin-right: calc(var(--gap-inline) * -1);
 }
 
 .is-tool:disabled {
@@ -504,10 +513,6 @@ body {
 
 .is-words::placeholder {
   color: var(--dim);
-}
-
-.is-prompt-row {
-  flex-wrap: wrap;
 }
 
 .is-advanced {

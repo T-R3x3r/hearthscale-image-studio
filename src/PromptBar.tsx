@@ -58,7 +58,7 @@ function Menu(props: { label: string; value: string; icon?: ReactNode; children:
         onClick={(e) => setAnchor(anchorFrom(props.label, e))}
       >
         {props.icon}
-        <span className="hs-model-trigger-name">{props.value}</span>
+        <span className="hs-model-trigger-name hs-cut">{props.value}</span>
         <Icon name="arrow-down-s-line" size={14} className="hs-model-trigger-chevron" />
       </button>
       {anchor && (
@@ -128,6 +128,37 @@ function ModelSlot() {
   return <span ref={place} className="is-model-slot" />;
 }
 
+/** Whether a row of controls is too short to hold them at full width:
+ *  each picker with its whole name, and each part that takes the free
+ *  room at its least width. The sum is the same whether the pickers show
+ *  their names or not, so the answer holds once the names hide. */
+function useShortRow(row: RefObject<HTMLDivElement | null>): boolean {
+  const [short, setShort] = useState(false);
+  const measure = () => {
+    const el = row.current!;
+    const style = getComputedStyle(el);
+    const room = el.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+    const parts = [...el.children].filter((part) => getComputedStyle(part).display !== 'none');
+    let need = parseFloat(style.columnGap) * (parts.length - 1);
+    for (const part of parts) {
+      const own = getComputedStyle(part);
+      need += Number(own.flexGrow) > 0 ? parseFloat(own.minWidth) || 0 : part.getBoundingClientRect().width;
+      for (const name of part.querySelectorAll<HTMLElement>('.hs-model-trigger-name')) {
+        const shown = name.getBoundingClientRect().width + parseFloat(getComputedStyle(name).marginRight);
+        need += name.scrollWidth - shown;
+      }
+    }
+    setShort((was) => need > (was ? room - 1 : room));
+  };
+  useLayoutEffect(measure);
+  useLayoutEffect(() => {
+    const observer = new ResizeObserver(() => measure());
+    observer.observe(row.current!);
+    return () => observer.disconnect();
+  }, []);
+  return short;
+}
+
 export function PromptBar(props: {
   words: string;
   onWords: (words: string) => void;
@@ -165,6 +196,8 @@ export function PromptBar(props: {
   helping: boolean;
 }) {
   const file = useRef<HTMLInputElement>(null);
+  const footer = useRef<HTMLDivElement>(null);
+  const short = useShortRow(footer);
   const [advancedAt, setAdvancedAt] = useState<HTMLElement | null>(null);
   const tips = useFloatingTips('top');
   const set = (field: keyof Advanced) => (e: { target: { value: string } }) =>
@@ -226,7 +259,7 @@ export function PromptBar(props: {
             }}
           />
         </div>
-        <div className="hs-composer-footer is-prompt-row">
+        <div ref={footer} className="hs-composer-footer is-prompt-row" data-short={short ? 'true' : undefined}>
           {!props.comparing && (!props.source || props.canAddReference) && (
             <span {...add.hover} className="is-tipwrap">
               <Tool
@@ -302,7 +335,11 @@ export function PromptBar(props: {
             )}
           </Menu>
           {props.showCount && props.abilities.count > 1 && (
-            <Menu label="Number of pictures" value={props.count === 1 ? '1 picture' : `${props.count} pictures`}>
+            <Menu
+              label="Number of pictures"
+              value={props.count === 1 ? '1 picture' : `${props.count} pictures`}
+              icon={<Icon name="stack-line" size={14} />}
+            >
               {(close) =>
                 [1, 2, 4]
                   .filter((n) => n <= props.abilities.count)
