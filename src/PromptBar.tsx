@@ -181,7 +181,7 @@ function Loras(props: { adapters: ModelCard[]; on: Lora[]; onChange: (on: Lora[]
         onClick={(e) => setAt(e.currentTarget)}
       >
         <Icon name="puzzle-line" size={14} />
-        <span className="hs-model-trigger-name">
+        <span className="hs-model-trigger-name hs-cut">
           {used.length === 0 ? 'No LoRA' : used.length === 1 ? '1 LoRA' : `${used.length} LoRAs`}
         </span>
         <Icon name="arrow-down-s-line" size={14} className="hs-model-trigger-chevron" />
