@@ -36,6 +36,20 @@ export function Details(props: {
         {style && <FactRow label="Style" value={style} />}
         {run?.negative && <FactRow label="Things to leave out" value={run.negative} />}
         {picture.label && <FactRow label="Model" value={picture.label} />}
+        {run && run.loras.length > 0 && (
+          <FactRow
+            label="LoRAs"
+            value={
+              <span className="hs-fact-lines">
+                {run.loras.map((lora) => (
+                  <span key={lora.id}>
+                    {lora.label} {lora.weight.toLocaleString(locale, { maximumFractionDigits: 2 })}
+                  </span>
+                ))}
+              </span>
+            }
+          />
+        )}
         {size && <FactRow label="Size" value={`${size.width} × ${size.height}`} />}
         {run?.steps !== null && run?.steps !== undefined && <FactRow label="Detail" value={String(run.steps)} />}
         {run?.guidance !== null && run?.guidance !== undefined && (

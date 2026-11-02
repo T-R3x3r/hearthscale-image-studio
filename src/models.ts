@@ -57,24 +57,26 @@ export interface Lora {
   weight: number;
 }
 
-/** The LoRAs turned on that fit an image model, each with its card. */
-export function fitting(card: ModelCard, on: Lora[], adapters: ModelCard[]) {
+/** A LoRA installed on a Server, with how strongly a job applies it. */
+export interface Fitted {
+  adapter: ModelCard;
+  weight: number;
+}
+
+/** The LoRAs of `on` that are installed and fit an image model, each with
+ *  its card; none where the model draws with no LoRAs. */
+export function fitting(card: ModelCard, on: Lora[], adapters: ModelCard[]): Fitted[] {
+  if (!abilitiesOf(card).loras) return [];
   return on.flatMap((lora) => {
     const adapter = adapters.find((a) => a.id === lora.id && a.fits?.includes(card.id));
     return adapter ? [{ adapter, weight: lora.weight }] : [];
   });
 }
 
-/** An image job's input with the LoRAs turned on that fit its model: each
- *  named with its weight, and their trigger words before the prompt. */
-export function withLoras(
-  input: Record<string, unknown>,
-  card: ModelCard,
-  on: Lora[],
-  adapters: ModelCard[],
-): Record<string, unknown> {
-  const used = fitting(card, on, adapters);
-  if (!abilitiesOf(card).loras || used.length === 0) return input;
+/** An image job's input with its LoRAs: each named with its weight, and
+ *  their trigger words before the prompt. */
+export function withLoras(input: Record<string, unknown>, used: Fitted[]): Record<string, unknown> {
+  if (used.length === 0) return input;
   const triggers = used.flatMap(({ adapter }) => adapter.triggers ?? []);
   return {
     ...input,

@@ -20,7 +20,16 @@ import {
   type Picture,
   type Run,
 } from './records';
-import { abilitiesOf, onDownload, readModels, withLoras, type Abilities, type Lora, type Models } from './models';
+import {
+  abilitiesOf,
+  fitting,
+  onDownload,
+  readModels,
+  withLoras,
+  type Abilities,
+  type Lora,
+  type Models,
+} from './models';
 import { blobOf, extended, fileName, marginsOf, maskOf, prepared, sizeOf, upload, type Stroke } from './pictures';
 import {
   dimensions,
@@ -118,6 +127,7 @@ function newRun(fields: Partial<Run> & Pick<Run, 'kind' | 'action' | 'model' | '
     compare: null,
     job: null,
     inputs: [],
+    loras: [],
     status: 'making',
     error: null,
     started: null,
@@ -509,22 +519,24 @@ export function Studio() {
     return action === 'fill' ? 'Write what to put there' : 'Write what you want to see';
   })();
 
-  /** Starts a run and puts it on the stage while it makes; `again` starts
-   *  the same run anew if this one fails. */
-  async function begin(run: Run, input: Record<string, unknown>, again: () => Promise<unknown>) {
+  /** Starts a run with those of `loras` that are installed and fit its
+   *  model, and puts it on the stage while it makes; `again` starts the
+   *  same run anew if this one fails. */
+  async function begin(run: Run, input: Record<string, unknown>, again: () => Promise<unknown>, loras: Lora[]) {
+    const card = imageCards.find((c) => c.id === run.model);
+    const used = card ? fitting(card, loras, models?.adapters ?? []) : [];
+    const started: Run = {
+      ...run,
+      loras: used.map(({ adapter, weight }) => ({ id: adapter.id, label: adapter.label, weight })),
+    };
     setProblem(null);
-    agains.current.set(run.id, again);
-    setStripRun(run);
+    agains.current.set(started.id, again);
+    setStripRun(started);
     setStrip([]);
     shownBefore.current = shown;
-    if (run.action !== 'enlarge') setShown(null);
+    if (started.action !== 'enlarge') setShown(null);
     setComparing(null);
-    const card = imageCards.find((c) => c.id === run.model);
-    await startRun(
-      run,
-      run.kind === 'image' && card ? withLoras(input, card, prefs.loras, models?.adapters ?? []) : input,
-      LABELS[run.action],
-    );
+    await startRun(started, withLoras(input, used), LABELS[started.action]);
   }
 
   async function hold(paths: string[]): Promise<string[]> {
@@ -564,10 +576,16 @@ export function Studio() {
       seed: settings.seed,
       count: settings.count,
     });
-    await begin(run, { prompt, ...sized(abilities, width, height), ...settings.input }, make);
+    await begin(run, { prompt, ...sized(abilities, width, height), ...settings.input }, make, prefs.loras);
   }
 
-  async function change(kind: Action, from: Picture = source!, strength = amount, prompt = words.trim()) {
+  async function change(
+    kind: Action,
+    from: Picture = source!,
+    strength = amount,
+    prompt = words.trim(),
+    loras: Lora[] = prefs.loras,
+  ) {
     const size = from.id === source?.id && sourceSize ? sourceSize : await sizeOf(from.path);
     const styled = withStyle(prompt || from.prompt, kind === 'erase' || kind === 'extend' ? null : prefs.style);
     const settings = shared(abilities, advanced, styled.avoid, kind === 'extend' || kind === 'erase' ? 1 : prefs.count);
@@ -627,8 +645,11 @@ export function Studio() {
       source: from.id,
       inputs,
     });
-    await begin(run, { ...input, ...sized(abilities, width, height), ...settings.input }, () =>
-      change(kind, from, strength, prompt),
+    await begin(
+      run,
+      { ...input, ...sized(abilities, width, height), ...settings.input },
+      () => change(kind, from, strength, prompt, loras),
+      loras,
     );
     if (kind === 'fill' || kind === 'erase' || kind === 'extend') {
       setTool('none');
@@ -696,7 +717,7 @@ export function Studio() {
       compare: null,
     });
     const sizes = run.width && run.height ? sized(abilitiesOf(card), run.width, run.height) : {};
-    await begin(next, { prompt: styled.prompt, ...sizes, ...settings.input }, () => more(run));
+    await begin(next, { prompt: styled.prompt, ...sizes, ...settings.input }, () => more(run), run.loras);
   }
 
   /** Starts the Server's download of a model the app needs, with Hearthscale's install card. */
@@ -717,7 +738,7 @@ export function Studio() {
       source: picture.id,
       inputs,
     });
-    await begin(run, { image: inputs[0] }, () => enlarge(picture));
+    await begin(run, { image: inputs[0] }, () => enlarge(picture), []);
   }
 
   async function openFile(file: Blob) {
@@ -799,6 +820,7 @@ export function Studio() {
     );
     setPrefs({
       style: run.style,
+      loras: run.loras.map(({ id, weight }) => ({ id, weight })),
       ...(fit ?? {}),
     });
   }
@@ -886,7 +908,10 @@ export function Studio() {
         : undefined,
     vary: abilities.change
       ? (how) => {
-          const again = () => change('change', picture, VARY[how], picture.prompt);
+          const again = async () => {
+            const run = await getRun(picture.run);
+            if (run) await change('change', picture, VARY[how], picture.prompt, run.loras);
+          };
           void again().catch(failed(UNDONE.change, again));
         }
       : undefined,

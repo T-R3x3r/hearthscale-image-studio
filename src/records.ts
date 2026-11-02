@@ -22,10 +22,18 @@ export interface Run {
   compare: string | null;
   job: string | null;
   inputs: string[];
+  loras: RunLora[];
   status: 'making' | 'done' | 'failed' | 'cancelled';
   error: string | null;
   started: number | null;
   finished: number | null;
+}
+
+/** A LoRA a run drew with: its card's id and name, and its weight. */
+export interface RunLora {
+  id: string;
+  label: string;
+  weight: number;
 }
 
 /** Words that name a picture, such as its prompt, with a capital first letter. */
@@ -91,6 +99,14 @@ CREATE TABLE IF NOT EXISTS pictures (
   favourite INTEGER NOT NULL DEFAULT 0,
   made INTEGER NOT NULL
 );
+CREATE TABLE IF NOT EXISTS run_loras (
+  run TEXT NOT NULL REFERENCES runs (id),
+  idx INTEGER NOT NULL,
+  adapter TEXT NOT NULL,
+  label TEXT NOT NULL,
+  weight REAL NOT NULL,
+  PRIMARY KEY (run, idx)
+);
 CREATE INDEX IF NOT EXISTS pictures_made ON pictures (made);
 CREATE INDEX IF NOT EXISTS pictures_run ON pictures (run);
 CREATE INDEX IF NOT EXISTS runs_compare ON runs (compare);
@@ -103,8 +119,16 @@ export async function openLibrary(): Promise<void> {
 type Row = Record<string, unknown>;
 
 function runOf(row: Row): Run {
-  return { ...(row as unknown as Run), inputs: JSON.parse(String(row.inputs ?? '[]')) as string[] };
+  return {
+    ...(row as unknown as Run),
+    inputs: JSON.parse(String(row.inputs ?? '[]')) as string[],
+    loras: JSON.parse(String(row.loras)) as RunLora[],
+  };
 }
+
+/** A run's columns, its LoRAs in their order as one JSON array. */
+const RUN_COLUMNS = `r.*, (SELECT json_group_array(json_object('id', l.adapter, 'label', l.label, 'weight', l.weight))
+  FROM (SELECT * FROM run_loras WHERE run = r.id ORDER BY idx) l) AS loras`;
 
 function pictureOf(row: Row): Picture {
   return { ...(row as unknown as Picture), favourite: row.favourite === 1 || row.favourite === true };
@@ -113,7 +137,7 @@ function pictureOf(row: Row): Picture {
 const PICTURE_COLUMNS = `p.id, p.run, p.idx, p.path, p.seed, p.favourite, p.made, r.prompt, r.label, r.action`;
 
 export async function addRun(run: Run): Promise<void> {
-  await call('hearthscale/db/exec', {
+  const insert = {
     sql: `INSERT INTO runs (id, made, kind, action, model, label, prompt, negative, style, width, height, steps,
       guidance, seed, strength, count, source, compare, job, inputs, status, error, started, finished)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -142,6 +166,15 @@ export async function addRun(run: Run): Promise<void> {
       run.error,
       run.started,
       run.finished,
+    ],
+  };
+  await call('hearthscale/db/batch', {
+    statements: [
+      insert,
+      ...run.loras.map((lora, idx) => ({
+        sql: 'INSERT INTO run_loras (run, idx, adapter, label, weight) VALUES (?, ?, ?, ?, ?)',
+        params: [run.id, idx, lora.id, lora.label, lora.weight],
+      })),
     ],
   });
 }
@@ -176,12 +209,17 @@ export async function finishRun(
 }
 
 export async function getRun(id: string): Promise<Run | null> {
-  const { rows } = await call('hearthscale/db/query', { sql: 'SELECT * FROM runs WHERE id = ?', params: [id] });
+  const { rows } = await call('hearthscale/db/query', {
+    sql: `SELECT ${RUN_COLUMNS} FROM runs r WHERE r.id = ?`,
+    params: [id],
+  });
   return rows[0] ? runOf(rows[0]) : null;
 }
 
 export async function makingRuns(): Promise<Run[]> {
-  const { rows } = await call('hearthscale/db/query', { sql: "SELECT * FROM runs WHERE status = 'making'" });
+  const { rows } = await call('hearthscale/db/query', {
+    sql: `SELECT ${RUN_COLUMNS} FROM runs r WHERE r.status = 'making'`,
+  });
   return rows.map(runOf);
 }
 
@@ -220,7 +258,7 @@ export async function listPictures(filter: { words: string; favourites: boolean 
 
 export async function runsOfCompare(compare: string): Promise<Run[]> {
   const { rows } = await call('hearthscale/db/query', {
-    sql: 'SELECT * FROM runs WHERE compare = ? ORDER BY made',
+    sql: `SELECT ${RUN_COLUMNS} FROM runs r WHERE r.compare = ? ORDER BY r.made`,
     params: [compare],
   });
   return rows.map(runOf);
