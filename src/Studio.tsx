@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type RefObject } from 'react';
 import type { ChatMessage, ModelCard } from '@hearthscale/app';
 import { Button, Icon, IconButton, Lightbox, Meter, ShellConfirm, Toast, useFloatingTips } from '@hearthscale/app-ui';
-import { call, download, fileUrl, hostContext, on, reason, tool } from './bridge';
+import { call, dataPath, download, fileUrl, hostContext, on, reason, tool } from './bridge';
 import {
   addRun,
   finishRun,
@@ -34,7 +34,7 @@ import {
   type SizeId,
 } from './recipes';
 import { cancelRun, newId, onEnded, recoverRuns, startRun, useLive } from './runs';
-import { Library } from './Library';
+import { Library, type LibraryActions } from './Library';
 import { Stage, StageBar, type Mode, type PictureActions, type Sides, type StageProps, type Tool } from './Stage';
 import { PromptBar, type Advanced } from './PromptBar';
 import { ComparePage, type Column } from './ComparePage';
@@ -240,7 +240,10 @@ export function Studio() {
   const [shown, setShown] = useState<Picture | null>(null);
   const [shownSize, setShownSize] = useState<{ width: number; height: number } | null>(null);
   const [shownFrom, setShownFrom] = useState<Picture | null>(null);
-  const [comparing, setComparing] = useState(false);
+  const [comparing, setComparing] = useState<StageProps['comparing']>(null);
+  const [selected, setSelected] = useState<string[]>([]);
+  /** The two selected pictures, earlier first, where they have one shape. */
+  const [pair, setPair] = useState<[Picture, Picture] | null>(null);
   const [stripRun, setStripRun] = useState<Run | null>(null);
   const [strip, setStrip] = useState<Picture[]>([]);
   const [source, setSource] = useState<Picture | null>(null);
@@ -260,8 +263,8 @@ export function Studio() {
   const [compareRuns, setCompareRuns] = useState<{ run: Run; picture: Picture | null }[]>([]);
   const [problem, setProblem] = useState<Problem | null>(null);
   const [toast, setToast] = useState<{ text: string; undo?: () => void } | null>(null);
-  const [large, setLarge] = useState<number | null>(null);
-  const [deleting, setDeleting] = useState<Picture | null>(null);
+  const [large, setLarge] = useState<{ items: Picture[]; start: number } | null>(null);
+  const [deleting, setDeleting] = useState<Picture[] | null>(null);
   const [helping, setHelping] = useState(false);
   const [starting, setStarting] = useState(false);
   const [opened, setOpened] = useState(false);
@@ -303,7 +306,7 @@ export function Studio() {
   const show = useCallback(async (picture: Picture | null) => {
     setProblem(null);
     setShown(picture);
-    setComparing(false);
+    setComparing(null);
     if (!picture) return;
     if (stripRunRef.current?.id !== picture.run) {
       setStripRun(await getRun(picture.run));
@@ -408,6 +411,26 @@ export function Studio() {
   }, [shown]);
 
   useEffect(() => {
+    const id = shown?.id;
+    setSelected((before) => (id ? (before.includes(id) ? before : [id]) : []));
+  }, [shown?.id]);
+
+  useEffect(() => {
+    setPair(null);
+    if (selected.length !== 2) return;
+    const two = selected.map((id) => pictures.find((p) => p.id === id));
+    if (!two[0] || !two[1]) return;
+    const [a, b] = (two as Picture[]).sort((x, y) => x.made - y.made);
+    let current = true;
+    void Promise.all([sizeOf(a.path), sizeOf(b.path)]).then(([x, y]) => {
+      if (current && Math.abs(x.width / x.height - y.width / y.height) < 0.01) setPair([a, b]);
+    });
+    return () => {
+      current = false;
+    };
+  }, [selected, pictures]);
+
+  useEffect(() => {
     setSourceSize(null);
     setTool('none');
     setStrokes([]);
@@ -494,7 +517,7 @@ export function Studio() {
     setStrip([]);
     shownBefore.current = shown;
     if (run.action !== 'enlarge') setShown(null);
-    setComparing(false);
+    setComparing(null);
     await startRun(run, input, LABELS[run.action]);
   }
 
@@ -636,9 +659,8 @@ export function Studio() {
     }
   }
 
-  async function more() {
-    const run = stripRun;
-    if (!run || !model) return;
+  async function more(run: Run) {
+    if (!model) return;
     const card = imageCards.find((c) => c.id === run.model) ?? model;
     const styled = withStyle(run.prompt, run.style);
     const settings = shared(
@@ -668,7 +690,7 @@ export function Studio() {
       compare: null,
     });
     const sizes = run.width && run.height ? sized(abilitiesOf(card), run.width, run.height) : {};
-    await begin(next, { prompt: styled.prompt, ...sizes, ...settings.input }, more);
+    await begin(next, { prompt: styled.prompt, ...sizes, ...settings.input }, () => more(run));
   }
 
   /** Starts the Server's download of a model the app needs, with Hearthscale's install card. */
@@ -791,76 +813,140 @@ export function Studio() {
     }
   }
 
-  async function remove(picture: Picture) {
-    setDeleting(null);
+  async function copyPrompt(picture: Picture) {
     try {
-      await tool('remove', { paths: [picture.path] }, 'Delete');
-      await forgetPictures([picture.id]);
-      if (source?.id === picture.id) setSource(null);
-      setReferences((before) => before.filter((r) => r.id !== picture.id));
-      const left = strip.filter((p) => p.id !== picture.id);
-      setStrip(left);
-      await show(left[0] ?? null);
-      await refreshLibrary();
+      await navigator.clipboard.writeText(picture.prompt);
+      setToast({ text: 'Prompt copied' });
     } catch (error) {
-      failed('The picture was not deleted.', () => remove(picture))(error);
+      failed('The prompt was not copied.', () => copyPrompt(picture))(error);
     }
   }
 
-  async function toggleFavourite(picture: Picture) {
-    await setFavourite(picture.id, !picture.favourite);
-    const flipped = { ...picture, favourite: !picture.favourite };
-    setShown((s) => (s?.id === picture.id ? flipped : s));
-    setStrip((list) => list.map((p) => (p.id === picture.id ? flipped : p)));
+  /** Shows the folder of the picture's run in the system's file manager. */
+  async function reveal(picture: Picture) {
+    try {
+      await call('openai/files/open', { path: dataPath(picture.path.slice(0, picture.path.lastIndexOf('/'))) });
+    } catch (error) {
+      failed('The folder did not open.', null)(error);
+    }
+  }
+
+  async function remove(gone: Picture[]) {
+    setDeleting(null);
+    const ids = new Set(gone.map((p) => p.id));
+    const kept = (p: Picture) => !ids.has(p.id);
+    try {
+      await tool('remove', { paths: gone.map((p) => p.path) }, 'Delete');
+      await forgetPictures([...ids]);
+      if (source && ids.has(source.id)) setSource(null);
+      setReferences((before) => before.filter(kept));
+      setStrip((before) => before.filter(kept));
+      if (shown && ids.has(shown.id)) {
+        const at = pictures.findIndex((p) => p.id === shown.id);
+        const next =
+          at < 0 ? strip.find(kept) : (pictures.slice(at + 1).find(kept) ?? pictures.slice(0, at).reverse().find(kept));
+        await show(next ?? null);
+      }
+      await refreshLibrary();
+    } catch (error) {
+      failed(gone.length === 1 ? 'The picture was not deleted.' : 'The pictures were not deleted.', () => remove(gone))(
+        error,
+      );
+    }
+  }
+
+  async function markFavourite(marked: Picture[], favourite: boolean) {
+    for (const picture of marked) await setFavourite(picture.id, favourite);
+    const ids = new Set(marked.map((p) => p.id));
+    const flip = (p: Picture) => (ids.has(p.id) ? { ...p, favourite } : p);
+    setShown((s) => s && flip(s));
+    setStrip((list) => list.map(flip));
     await refreshLibrary();
   }
 
-  const actions: PictureActions | null = shown
-    ? {
-        edit:
-          abilities.change || abilities.edit ? () => (setSource(shown), setReferences([]), setWords('')) : undefined,
-        addToPrompt:
-          source &&
-          abilities.edit &&
-          source.id !== shown.id &&
-          !references.some((r) => r.id === shown.id) &&
-          references.length < 9
-            ? () => setReferences((before) => [...before, shown])
-            : undefined,
-        vary: abilities.change
-          ? (how) => {
-              const again = () => change('change', shown, VARY[how], shown.prompt);
-              void again().catch(failed(UNDONE.change, again));
-            }
-          : undefined,
-        enlarge:
-          upscaler || (models?.absentUpscale.length ?? 0) > 0
-            ? () => {
-                const again = () => enlarge(shown);
-                void again().catch(failed(UNDONE.enlarge, again));
-              }
-            : undefined,
-        plainBackground: abilities.edit
-          ? () => {
-              const again = () => change('edit', shown, 1, PLAIN_BACKGROUND_WORDS);
-              void again().catch(failed(UNDONE.edit, again));
-            }
-          : undefined,
-        compareSource: shownFrom ? () => setComparing(true) : undefined,
-        favourite: () => void toggleFavourite(shown),
-        save: () => void saveAs(shown),
-        copy: () => void copy(shown),
-        large: () =>
-          setLarge(
-            Math.max(
-              0,
-              strip.findIndex((p) => p.id === shown.id),
-            ),
-          ),
-        settings: () => void useSettings(shown),
-        remove: () => setDeleting(shown),
-      }
-    : null;
+  /** What the person can do with a picture, on the stage or from the library's menu. */
+  const actionsFor = (picture: Picture): PictureActions => ({
+    edit:
+      abilities.change || abilities.edit
+        ? () => (setPage('studio'), setSource(picture), setReferences([]), setWords(''))
+        : undefined,
+    addToPrompt:
+      source &&
+      abilities.edit &&
+      source.id !== picture.id &&
+      !references.some((r) => r.id === picture.id) &&
+      references.length < 9
+        ? () => setReferences((before) => [...before, picture])
+        : undefined,
+    vary: abilities.change
+      ? (how) => {
+          const again = () => change('change', picture, VARY[how], picture.prompt);
+          void again().catch(failed(UNDONE.change, again));
+        }
+      : undefined,
+    more:
+      model && picture.action === 'make'
+        ? () => {
+            const again = async () => {
+              const run = await getRun(picture.run);
+              if (run) await more(run);
+            };
+            void again().catch(failed(UNDONE.make, again));
+          }
+        : undefined,
+    enlarge:
+      upscaler || (models?.absentUpscale.length ?? 0) > 0
+        ? () => {
+            const again = () => enlarge(picture);
+            void again().catch(failed(UNDONE.enlarge, again));
+          }
+        : undefined,
+    plainBackground: abilities.edit
+      ? () => {
+          const again = () => change('edit', picture, 1, PLAIN_BACKGROUND_WORDS);
+          void again().catch(failed(UNDONE.edit, again));
+        }
+      : undefined,
+    compareSource:
+      picture.id === shown?.id && shownFrom
+        ? () => setComparing({ before: shownFrom, beforeName: 'Before', afterName: 'After' })
+        : undefined,
+    favourite: () => void markFavourite([picture], !picture.favourite),
+    save: () => void saveAs(picture),
+    copy: () => void copy(picture),
+    copyPrompt: picture.prompt ? () => void copyPrompt(picture) : undefined,
+    reveal: () => void reveal(picture),
+    large: () => {
+      const items = strip.some((p) => p.id === picture.id) ? strip : [picture];
+      setLarge({ items, start: items.findIndex((p) => p.id === picture.id) });
+    },
+    settings: () => void useSettings(picture),
+    remove: () => setDeleting([picture]),
+  });
+
+  const libraryActions: LibraryActions = {
+    of: actionsFor,
+    large: (picture) => setLarge({ items: pictures, start: pictures.findIndex((p) => p.id === picture.id) }),
+    compare: pair
+      ? () => {
+          const [before, after] = pair;
+          const named = before.label && after.label && before.label !== after.label;
+          void show(after).then(() =>
+            setComparing({
+              before,
+              beforeName: named ? before.label : 'Earlier',
+              afterName: named ? after.label : 'Later',
+            }),
+          );
+        }
+      : null,
+    favourite: (marked, on) => void markFavourite(marked, on),
+    remove: (gone) => {
+      if (gone.length > 0) setDeleting(gone);
+    },
+  };
+
+  const actions: PictureActions | null = shown ? actionsFor(shown) : null;
 
   const stripLive = stripRun ? (live.get(stripRun.id) ?? null) : null;
   const margins =
@@ -869,8 +955,7 @@ export function Studio() {
   const stageSize = stagePicture && stagePicture.id === source?.id && sourceSize ? sourceSize : shownSize;
   const columns: Column[] = compareRuns.map(({ run, picture }) => ({ run, picture, live: live.get(run.id) ?? null }));
   const fold = tips('fold', folded ? 'Show the library' : 'Hide the library');
-  const lightboxItems = strip.length ? strip : shown ? [shown] : [];
-  const lightbox = large !== null && lightboxItems.length > 0;
+  const lightbox = large !== null && large.items.length > 0;
   /** A part the view draws over the prompt's footer, under which the model slot lies. */
   const covering = lightbox || !!deleting || (cramped && !folded);
   const suggestedImage = models?.downloading.find((card) => card.kind === 'image') ?? models?.absentImage[0] ?? null;
@@ -889,9 +974,8 @@ export function Studio() {
     picture: stagePicture,
     size: stageSize,
     source,
-    sourceOf: shownFrom,
     comparing,
-    onStopCompare: () => setComparing(false),
+    onStopCompare: () => setComparing(null),
     live: stripLive,
     liveLabel,
     liveModel: stripRun?.label ?? '',
@@ -961,12 +1045,20 @@ export function Studio() {
             pictures={pictures}
             locale={locale}
             shown={page === 'studio' ? (shown?.id ?? null) : null}
+            selected={page === 'studio' ? selected : []}
             words={search}
             favourites={favourites}
             page={page}
+            actions={libraryActions}
             onWords={setSearch}
             onFavourites={setFavourites}
-            onShow={(picture) => (away(), setPage('studio'), void show(picture))}
+            onSelect={(ids, picture) => {
+              setSelected(ids);
+              if (!picture) return;
+              setPage('studio');
+              void show(picture);
+            }}
+            onOpen={away}
             onNew={() => {
               away();
               setPage('studio');
@@ -1033,7 +1125,10 @@ export function Studio() {
                       variant="ghost"
                       size="sm"
                       icon={<Icon name="add-line" size={14} />}
-                      onClick={() => void more().catch(failed(UNDONE.make, more))}
+                      onClick={() => {
+                        const again = () => more(stripRun);
+                        void again().catch(failed(UNDONE.make, again));
+                      }}
                     >
                       Make more
                     </Button>
@@ -1100,20 +1195,24 @@ export function Studio() {
       </main>
       {lightbox && (
         <Lightbox
-          items={lightboxItems.map((p) => ({
+          items={large.items.map((p) => ({
             src: fileUrl(p.path),
             name: pictureName(p),
             onSave: () => void saveAs(p),
           }))}
-          start={Math.min(large, lightboxItems.length - 1)}
+          start={Math.max(0, Math.min(large.start, large.items.length - 1))}
           onClose={() => setLarge(null)}
         />
       )}
       {deleting && (
         <ShellConfirm
-          title="Delete this picture?"
-          body="Its file in the app's folder is deleted too."
-          action="Delete"
+          title={deleting.length === 1 ? 'Delete this picture?' : `Delete ${deleting.length} pictures?`}
+          body={
+            deleting.length === 1
+              ? "Its file in the app's folder is deleted too."
+              : "Their files in the app's folder are deleted too."
+          }
+          action={deleting.length === 1 ? 'Delete' : `Delete ${deleting.length} pictures`}
           tone="danger"
           onConfirm={() => void remove(deleting)}
           onCancel={() => setDeleting(null)}

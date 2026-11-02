@@ -1,7 +1,19 @@
-import { useMemo } from 'react';
-import { Button, Icon, TextInput, VirtualList } from '@hearthscale/app-ui';
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent } from 'react';
+import {
+  Button,
+  Icon,
+  MDivider,
+  MItem,
+  MenuSurface,
+  TextInput,
+  VirtualList,
+  type MenuAnchor,
+  type VirtualListHandle,
+} from '@hearthscale/app-ui';
 import { fileUrl } from './bridge';
 import { pictureName, type Picture } from './records';
+import type { PictureActions } from './Stage';
+import { Details } from './Details';
 
 const PER_ROW = 3;
 
@@ -48,20 +60,281 @@ function rowsOf(pictures: Picture[], locale: string): Row[] {
   return rows;
 }
 
+/** Where each picture sits in the rows: its row and its column. */
+function placesOf(rows: Row[]): Map<string, { row: number; column: number }> {
+  const places = new Map<string, { row: number; column: number }>();
+  rows.forEach((row, index) => {
+    if (row.kind === 'pictures') row.pictures.forEach((p, column) => places.set(p.id, { row: index, column }));
+  });
+  return places;
+}
+
+/** What the library's menu does with the pictures it opens on. */
+export interface LibraryActions {
+  /** The actions of one picture, as the stage offers them. */
+  of: (picture: Picture) => PictureActions;
+  /** Shows a picture large, among the pictures of the library. */
+  large: (picture: Picture) => void;
+  /** Compares the two selected pictures, where they have one shape. */
+  compare: (() => void) | null;
+  favourite: (pictures: Picture[], on: boolean) => void;
+  remove: (pictures: Picture[]) => void;
+}
+
+/** The rows of the menu of the selected pictures. */
+function PictureMenu(props: {
+  pictures: Picture[];
+  actions: LibraryActions;
+  close: () => void;
+  onDetails: (picture: Picture) => void;
+  onRemove: (pictures: Picture[]) => void;
+}) {
+  const { pictures, close } = props;
+  const run = (action: () => void) => () => (close(), action());
+  const allFavourite = pictures.every((p) => p.favourite);
+  const favourite = (
+    <MItem
+      icon={<Icon name="heart-line" size={14} />}
+      label={allFavourite ? 'Remove from favourites' : 'Add to favourites'}
+      onClick={run(() => props.actions.favourite(pictures, !allFavourite))}
+    />
+  );
+  if (pictures.length > 1) {
+    return (
+      <>
+        {props.actions.compare && (
+          <MItem
+            icon={<Icon name="contrast-2-line" size={14} />}
+            label="Compare"
+            onClick={run(props.actions.compare)}
+          />
+        )}
+        {favourite}
+        <MDivider />
+        <MItem
+          icon={<Icon name="delete-bin-line" size={14} />}
+          label={`Delete ${pictures.length} pictures`}
+          danger
+          onClick={run(() => props.onRemove(pictures))}
+        />
+      </>
+    );
+  }
+  const picture = pictures[0];
+  const actions = props.actions.of(picture);
+  return (
+    <>
+      <MItem
+        icon={<Icon name="fullscreen-line" size={14} />}
+        label="View large"
+        onClick={run(() => props.actions.large(picture))}
+      />
+      <MItem
+        icon={<Icon name="information-line" size={14} />}
+        label="Details"
+        onClick={run(() => props.onDetails(picture))}
+      />
+      {actions.edit && (
+        <MItem icon={<Icon name="image-edit-line" size={14} />} label="Edit this" onClick={run(actions.edit)} />
+      )}
+      {actions.addToPrompt && (
+        <MItem
+          icon={<Icon name="image-add-line" size={14} />}
+          label="Add to the prompt"
+          onClick={run(actions.addToPrompt)}
+        />
+      )}
+      {actions.vary && (
+        <>
+          <MItem
+            icon={<Icon name="shuffle-line" size={14} />}
+            label="Vary a little"
+            onClick={run(() => actions.vary!('little'))}
+          />
+          <MItem
+            icon={<Icon name="shuffle-line" size={14} />}
+            label="Vary a lot"
+            onClick={run(() => actions.vary!('lot'))}
+          />
+        </>
+      )}
+      {actions.more && (
+        <MItem icon={<Icon name="add-line" size={14} />} label="Make more like this" onClick={run(actions.more)} />
+      )}
+      {actions.enlarge && (
+        <MItem icon={<Icon name="zoom-in-line" size={14} />} label="Enlarge" onClick={run(actions.enlarge)} />
+      )}
+      {actions.compareSource && (
+        <MItem
+          icon={<Icon name="contrast-2-line" size={14} />}
+          label="Compare with the original"
+          onClick={run(actions.compareSource)}
+        />
+      )}
+      <MDivider />
+      <MItem icon={<Icon name="restart-line" size={14} />} label="Use these settings" onClick={run(actions.settings)} />
+      <MItem icon={<Icon name="file-copy-line" size={14} />} label="Copy" onClick={run(actions.copy)} />
+      {actions.copyPrompt && (
+        <MItem icon={<Icon name="file-text-line" size={14} />} label="Copy prompt" onClick={run(actions.copyPrompt)} />
+      )}
+      <MItem icon={<Icon name="download-2-line" size={14} />} label="Save as…" onClick={run(actions.save)} />
+      <MItem icon={<Icon name="folder-open-line" size={14} />} label="Show in folder" onClick={run(actions.reveal)} />
+      {favourite}
+      <MDivider />
+      <MItem
+        icon={<Icon name="delete-bin-line" size={14} />}
+        label="Delete"
+        danger
+        onClick={run(() => props.onRemove(pictures))}
+      />
+    </>
+  );
+}
+
 export function Library(props: {
   pictures: Picture[];
   locale: string;
   shown: string | null;
+  /** The ids of the selected pictures, the shown one among them. */
+  selected: string[];
   words: string;
   favourites: boolean;
   page: 'studio' | 'compare';
+  actions: LibraryActions;
   onWords: (words: string) => void;
   onFavourites: (on: boolean) => void;
-  onShow: (picture: Picture) => void;
+  /** Selects pictures, and shows one of them where `show` names it. */
+  onSelect: (ids: string[], show: Picture | null) => void;
+  /** A plain click chose one picture to look at. */
+  onOpen: () => void;
   onNew: () => void;
   onPage: (page: 'studio' | 'compare') => void;
 }) {
   const rows = useMemo(() => rowsOf(props.pictures, props.locale), [props.pictures, props.locale]);
+  const places = useMemo(() => placesOf(rows), [rows]);
+  const list = useRef<VirtualListHandle>(null);
+  /** The picture a Shift press selects from. */
+  const anchor = useRef<string | null>(null);
+  /** The pictures a delete from the library asked for: once they have
+   *  left the library and the focus left with them, the shown picture
+   *  takes the focus. */
+  const refocus = useRef<string[] | null>(null);
+  const [menu, setMenu] = useState<{ at: MenuAnchor; pictures: Picture[] } | null>(null);
+  const [details, setDetails] = useState<{ picture: Picture; at: HTMLElement } | null>(null);
+  const selected = new Set(props.selected);
+  const chosen = () => props.pictures.filter((p) => selected.has(p.id));
+  /** The one picture the keyboard reaches with Tab: the shown one, else the first. */
+  const current = places.has(props.shown ?? '') ? props.shown : (props.pictures[0]?.id ?? null);
+
+  const thumbOf = (id: string) => document.querySelector<HTMLElement>(`[data-picture="${id}"]`);
+
+  /** Scrolls a picture into sight and gives it the keyboard focus, once the
+   *  list has drawn its row. */
+  const focus = (id: string) => {
+    const place = places.get(id);
+    if (!place) return;
+    list.current?.scrollToIndex(place.row, 'auto');
+    let tries = 0;
+    const attempt = () => {
+      const thumb = thumbOf(id);
+      if (thumb) thumb.focus();
+      else if (tries++ < 10) setTimeout(attempt, 30);
+    };
+    attempt();
+  };
+
+  const remove = (pictures: Picture[]) => {
+    refocus.current = pictures.map((p) => p.id);
+    props.actions.remove(pictures);
+  };
+
+  useEffect(() => {
+    const gone = refocus.current?.every((id) => !places.has(id));
+    const lost = !document.activeElement || document.activeElement === document.body;
+    if (gone && lost && props.shown && places.has(props.shown)) {
+      refocus.current = null;
+      focus(props.shown);
+    }
+  });
+
+  /** The pictures from the anchor to `to`, in the library's order. */
+  const range = (to: Picture) => {
+    const from = props.pictures.findIndex((p) => p.id === (anchor.current ?? props.shown));
+    const end = props.pictures.findIndex((p) => p.id === to.id);
+    if (from < 0) return [to.id];
+    return props.pictures.slice(Math.min(from, end), Math.max(from, end) + 1).map((p) => p.id);
+  };
+
+  const pick = (picture: Picture, how: { toggle: boolean; extend: boolean }) => {
+    if (how.extend) return props.onSelect(range(picture), picture);
+    if (how.toggle) {
+      anchor.current = picture.id;
+      if (!selected.has(picture.id)) return props.onSelect([...props.selected, picture.id], picture);
+      const left = props.selected.filter((id) => id !== picture.id);
+      if (left.length === 0) return;
+      const show = picture.id === props.shown ? props.pictures.find((p) => p.id === left[left.length - 1])! : null;
+      return props.onSelect(left, show);
+    }
+    anchor.current = picture.id;
+    props.onSelect([picture.id], picture);
+  };
+
+  const open = (picture: Picture, element: HTMLElement) => {
+    const pictures = selected.has(picture.id) ? chosen() : [picture];
+    if (!selected.has(picture.id)) pick(picture, { toggle: false, extend: false });
+    setMenu({ at: { key: picture.id, element }, pictures });
+  };
+
+  /** The picture an arrow key moves to from `picture`. */
+  const neighbour = (picture: Picture, key: string): Picture | null => {
+    const index = props.pictures.findIndex((p) => p.id === picture.id);
+    if (key === 'ArrowLeft') return props.pictures[index - 1] ?? null;
+    if (key === 'ArrowRight') return props.pictures[index + 1] ?? null;
+    if (key === 'Home') return props.pictures[0] ?? null;
+    if (key === 'End') return props.pictures[props.pictures.length - 1] ?? null;
+    const place = places.get(picture.id)!;
+    const step = key === 'ArrowUp' ? -1 : 1;
+    for (let r = place.row + step; r >= 0 && r < rows.length; r += step) {
+      const row = rows[r];
+      if (row.kind === 'pictures') return row.pictures[Math.min(place.column, row.pictures.length - 1)];
+    }
+    return null;
+  };
+
+  const keyDown = (event: KeyboardEvent<HTMLButtonElement>, picture: Picture) => {
+    const key = event.key;
+    if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'].includes(key)) {
+      event.preventDefault();
+      const next = neighbour(picture, key);
+      if (!next) return;
+      if (event.shiftKey) props.onSelect(range(next), next);
+      else pick(next, { toggle: false, extend: false });
+      focus(next.id);
+    } else if (key === 'Delete' || key === 'Backspace') {
+      event.preventDefault();
+      remove(chosen());
+    } else if (key === ' ') {
+      event.preventDefault();
+      props.actions.large(picture);
+    } else if (key === 'a' && (event.ctrlKey || event.metaKey)) {
+      event.preventDefault();
+      props.onSelect(
+        props.pictures.map((p) => p.id),
+        null,
+      );
+    } else if (key === 'Escape' && props.selected.length > 1 && props.shown) {
+      event.preventDefault();
+      anchor.current = props.shown;
+      props.onSelect([props.shown], null);
+    }
+  };
+
+  const click = (event: MouseEvent<HTMLButtonElement>, picture: Picture) => {
+    const toggle = event.ctrlKey || event.metaKey;
+    pick(picture, { toggle, extend: event.shiftKey });
+    if (!toggle && !event.shiftKey) props.onOpen();
+  };
+
   return (
     <div className="hs-sidebar-column">
       <div className="is-library-head">
@@ -110,6 +383,7 @@ export function Library(props: {
         </div>
       ) : (
         <VirtualList
+          ref={list}
           className="is-library-list"
           count={rows.length}
           estimate={68}
@@ -126,9 +400,17 @@ export function Library(props: {
                   <button
                     key={picture.id}
                     className="is-thumb"
-                    data-on={picture.id === props.shown}
+                    data-picture={picture.id}
+                    data-on={selected.has(picture.id)}
+                    aria-pressed={selected.has(picture.id)}
                     aria-label={pictureName(picture)}
-                    onClick={() => props.onShow(picture)}
+                    tabIndex={picture.id === current ? 0 : -1}
+                    onClick={(event) => click(event, picture)}
+                    onKeyDown={(event) => keyDown(event, picture)}
+                    onContextMenu={(event) => {
+                      event.preventDefault();
+                      open(picture, event.currentTarget);
+                    }}
                   >
                     <img src={fileUrl(picture.path)} alt="" loading="lazy" decoding="async" />
                     {picture.favourite && <Icon name="heart-fill" size={12} className="is-thumb-mark" />}
@@ -137,6 +419,33 @@ export function Library(props: {
               </div>
             );
           }}
+        />
+      )}
+      {menu && (
+        <MenuSurface
+          anchor={menu.at}
+          dir="right"
+          keyboard
+          onDismiss={() => {
+            setMenu(null);
+            thumbOf(menu.at.key)?.focus();
+          }}
+        >
+          <PictureMenu
+            pictures={menu.pictures}
+            actions={props.actions}
+            close={() => setMenu(null)}
+            onDetails={(picture) => setDetails({ picture, at: menu.at.element })}
+            onRemove={remove}
+          />
+        </MenuSurface>
+      )}
+      {details && (
+        <Details
+          picture={details.picture}
+          anchor={details.at}
+          placement="right-start"
+          onDismiss={() => setDetails(null)}
         />
       )}
     </div>
