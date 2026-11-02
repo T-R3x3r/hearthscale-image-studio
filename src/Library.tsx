@@ -205,6 +205,8 @@ export function Library(props: {
   onFavourites: (on: boolean) => void;
   /** Selects pictures, and shows one of them where `show` names it. */
   onSelect: (ids: string[], show: Picture | null) => void;
+  /** A plain click chose one picture to look at. */
+  onOpen: () => void;
   onNew: () => void;
   onPage: (page: 'studio' | 'compare') => void;
 }) {
@@ -327,8 +329,11 @@ export function Library(props: {
     }
   };
 
-  const click = (event: MouseEvent<HTMLButtonElement>, picture: Picture) =>
-    pick(picture, { toggle: event.ctrlKey || event.metaKey, extend: event.shiftKey });
+  const click = (event: MouseEvent<HTMLButtonElement>, picture: Picture) => {
+    const toggle = event.ctrlKey || event.metaKey;
+    pick(picture, { toggle, extend: event.shiftKey });
+    if (!toggle && !event.shiftKey) props.onOpen();
+  };
 
   return (
     <div className="hs-sidebar-column">

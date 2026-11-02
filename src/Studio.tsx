@@ -1055,10 +1055,10 @@ export function Studio() {
             onSelect={(ids, picture) => {
               setSelected(ids);
               if (!picture) return;
-              if (ids.length === 1) away();
               setPage('studio');
               void show(picture);
             }}
+            onOpen={away}
             onNew={() => {
               away();
               setPage('studio');
