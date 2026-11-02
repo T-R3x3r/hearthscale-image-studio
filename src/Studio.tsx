@@ -660,16 +660,7 @@ export function Studio() {
         seed: settings.seed,
         compare: set,
       });
-      await startRun(
-        run,
-        withLoras(
-          { prompt, ...sized(abilitiesOf(card), width, height), ...settings.input },
-          card,
-          prefs.loras,
-          models?.adapters ?? [],
-        ),
-        LABELS.compare,
-      );
+      await startRun(run, { prompt, ...sized(abilitiesOf(card), width, height), ...settings.input }, LABELS.compare);
       await loadCompare(set);
     }
   }
