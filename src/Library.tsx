@@ -323,10 +323,11 @@ export function Library(props: {
         props.pictures.map((p) => p.id),
         null,
       );
-    } else if (key === 'Escape' && props.selected.length > 1 && props.shown) {
+    } else if (key === 'Escape' && props.selected.length > 1 && props.shown && places.has(props.shown)) {
       event.preventDefault();
       anchor.current = props.shown;
       props.onSelect([props.shown], null);
+      focus(props.shown);
     }
   };
 
