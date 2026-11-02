@@ -49,8 +49,18 @@ function Tool(props: {
   );
 }
 
-function Menu(props: { label: string; value: string; icon?: ReactNode; children: (close: () => void) => ReactNode }) {
+/** A picker of the composer's footer. In a short row it shows its icon
+ *  alone, and a tooltip names it. */
+function Menu(props: {
+  label: string;
+  value: string;
+  icon?: ReactNode;
+  short: boolean;
+  children: (close: () => void) => ReactNode;
+}) {
   const [anchor, setAnchor] = useState<MenuAnchor | null>(null);
+  const tips = useFloatingTips('top');
+  const tip = tips('trigger', props.short ? props.label : undefined);
   return (
     <>
       <button
@@ -58,10 +68,12 @@ function Menu(props: { label: string; value: string; icon?: ReactNode; children:
         className="hs-model-trigger hs-hovbox-ink"
         aria-label={props.label}
         onClick={(e) => setAnchor(anchorFrom(props.label, e))}
+        {...tip.hover}
       >
         {props.icon}
         <span className="hs-model-trigger-name hs-cut">{props.value}</span>
         <Icon name="arrow-down-s-line" size={14} className="hs-model-trigger-chevron" />
+        {tip.tip}
       </button>
       {anchor && (
         <MenuSurface anchor={anchor} dir="up" onDismiss={() => setAnchor(null)}>
@@ -162,9 +174,12 @@ function useShortRow(row: RefObject<HTMLDivElement | null>): boolean {
 }
 
 /** The LoRAs that fit the image model, each turned on or off with its
- *  weight, and the way to get more from the Server. */
-function Loras(props: { adapters: ModelCard[]; on: Lora[]; onChange: (on: Lora[]) => void }) {
+ *  weight, and the way to get more from the Server. In a short row the
+ *  picker shows its icon alone, and a tooltip names it. */
+function Loras(props: { adapters: ModelCard[]; on: Lora[]; onChange: (on: Lora[]) => void; short: boolean }) {
   const [at, setAt] = useState<HTMLElement | null>(null);
+  const tips = useFloatingTips('top');
+  const tip = tips('trigger', props.short ? 'LoRAs' : undefined);
   const used = props.on.filter((lora) => props.adapters.some((a) => a.id === lora.id));
   const flip = (id: string) =>
     props.onChange(
@@ -179,12 +194,14 @@ function Loras(props: { adapters: ModelCard[]; on: Lora[]; onChange: (on: Lora[]
         className="hs-model-trigger hs-hovbox-ink"
         aria-label="LoRAs"
         onClick={(e) => setAt(e.currentTarget)}
+        {...tip.hover}
       >
         <Icon name="puzzle-line" size={14} />
         <span className="hs-model-trigger-name hs-cut">
           {used.length === 0 ? 'No LoRA' : used.length === 1 ? '1 LoRA' : `${used.length} LoRAs`}
         </span>
         <Icon name="arrow-down-s-line" size={14} className="hs-model-trigger-chevron" />
+        {tip.tip}
       </button>
       {at && (
         <Popover anchor={at} placement="top-start" label="LoRAs" onDismiss={() => setAt(null)}>
@@ -355,6 +372,7 @@ export function PromptBar(props: {
                 label="Shape and size"
                 value={`${SHAPES.find((s) => s.id === props.shape)!.label}, ${SIZES.find((s) => s.id === props.size)!.label.toLowerCase()}`}
                 icon={<Icon name="aspect-ratio-line" size={14} />}
+                short={short}
               >
                 {(close) => (
                   <>
@@ -386,6 +404,7 @@ export function PromptBar(props: {
             label="Style"
             value={STYLES.find((s) => s.id === props.style)?.label ?? 'No style'}
             icon={<Icon name="palette-line" size={14} />}
+            short={short}
           >
             {(close) => (
               <>
@@ -403,13 +422,14 @@ export function PromptBar(props: {
             )}
           </Menu>
           {props.abilities.loras && !props.comparing && (
-            <Loras adapters={props.adapters} on={props.loras} onChange={props.onLoras} />
+            <Loras adapters={props.adapters} on={props.loras} onChange={props.onLoras} short={short} />
           )}
           {props.showCount && props.abilities.count > 1 && (
             <Menu
               label="Number of pictures"
               value={props.count === 1 ? '1 picture' : `${props.count} pictures`}
               icon={<Icon name="stack-line" size={14} />}
+              short={short}
             >
               {(close) =>
                 [1, 2, 4]
