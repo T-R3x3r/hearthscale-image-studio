@@ -23,6 +23,7 @@ import type { Live } from './runs';
 import { IDEAS } from './recipes';
 import { paintStrokes, type Margins, type Stroke } from './pictures';
 import { ProblemNotice } from './Problem';
+import { Details } from './Details';
 
 export type Tool = 'none' | 'brush' | 'extend';
 
@@ -407,6 +408,7 @@ export function StageBar(props: StageProps) {
   const [menu, setMenu] = useState<MenuAnchor | null>(null);
   const [sidesMenu, setSidesMenu] = useState<MenuAnchor | null>(null);
   const [varyMenu, setVaryMenu] = useState<MenuAnchor | null>(null);
+  const [detailsAt, setDetailsAt] = useState<HTMLElement | null>(null);
   const tips = useFloatingTips('bottom');
   const { picture } = props;
   const isSource = !!picture && picture.id === props.source?.id;
@@ -741,6 +743,11 @@ export function StageBar(props: StageProps) {
             onClick={() => (setMenu(null), actions.large())}
           />
           <MItem
+            icon={<Icon name="information-line" size={14} />}
+            label="Details"
+            onClick={() => (setMenu(null), setDetailsAt(menu.element))}
+          />
+          <MItem
             icon={<Icon name="file-copy-line" size={14} />}
             label="Copy"
             onClick={() => (setMenu(null), actions.copy())}
@@ -770,6 +777,9 @@ export function StageBar(props: StageProps) {
             onClick={() => (setMenu(null), actions.remove())}
           />
         </MenuSurface>
+      )}
+      {detailsAt && picture && (
+        <Details picture={picture} anchor={detailsAt} placement="bottom-end" onDismiss={() => setDetailsAt(null)} />
       )}
     </div>
   );

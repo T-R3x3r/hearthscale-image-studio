@@ -657,3 +657,9 @@ body {
     --studio-inset: var(--gap-row);
   }
 }
+
+.is-details {
+  display: flex;
+  flex-direction: column;
+  width: calc(var(--space) * 96);
+}

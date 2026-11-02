@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, type KeyboardEvent, type MouseEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent } from 'react';
 import {
   Button,
   Icon,
@@ -13,6 +13,7 @@ import {
 import { fileUrl } from './bridge';
 import { pictureName, type Picture } from './records';
 import type { PictureActions } from './Stage';
+import { Details } from './Details';
 
 const PER_ROW = 3;
 
@@ -81,7 +82,13 @@ export interface LibraryActions {
 }
 
 /** The rows of the menu of the selected pictures. */
-function PictureMenu(props: { pictures: Picture[]; actions: LibraryActions; close: () => void }) {
+function PictureMenu(props: {
+  pictures: Picture[];
+  actions: LibraryActions;
+  close: () => void;
+  onDetails: (picture: Picture) => void;
+  onRemove: (pictures: Picture[]) => void;
+}) {
   const { pictures, close } = props;
   const run = (action: () => void) => () => (close(), action());
   const allFavourite = pictures.every((p) => p.favourite);
@@ -108,7 +115,7 @@ function PictureMenu(props: { pictures: Picture[]; actions: LibraryActions; clos
           icon={<Icon name="delete-bin-line" size={14} />}
           label={`Delete ${pictures.length} pictures`}
           danger
-          onClick={run(() => props.actions.remove(pictures))}
+          onClick={run(() => props.onRemove(pictures))}
         />
       </>
     );
@@ -121,6 +128,11 @@ function PictureMenu(props: { pictures: Picture[]; actions: LibraryActions; clos
         icon={<Icon name="fullscreen-line" size={14} />}
         label="View large"
         onClick={run(() => props.actions.large(picture))}
+      />
+      <MItem
+        icon={<Icon name="information-line" size={14} />}
+        label="Details"
+        onClick={run(() => props.onDetails(picture))}
       />
       {actions.edit && (
         <MItem icon={<Icon name="image-edit-line" size={14} />} label="Edit this" onClick={run(actions.edit)} />
@@ -173,7 +185,7 @@ function PictureMenu(props: { pictures: Picture[]; actions: LibraryActions; clos
         icon={<Icon name="delete-bin-line" size={14} />}
         label="Delete"
         danger
-        onClick={run(() => props.actions.remove(pictures))}
+        onClick={run(() => props.onRemove(pictures))}
       />
     </>
   );
@@ -201,7 +213,12 @@ export function Library(props: {
   const list = useRef<VirtualListHandle>(null);
   /** The picture a Shift press selects from. */
   const anchor = useRef<string | null>(null);
+  /** The pictures a delete from the library asked for: once they have
+   *  left the library and the focus left with them, the shown picture
+   *  takes the focus. */
+  const refocus = useRef<string[] | null>(null);
   const [menu, setMenu] = useState<{ at: MenuAnchor; pictures: Picture[] } | null>(null);
+  const [details, setDetails] = useState<{ picture: Picture; at: HTMLElement } | null>(null);
   const selected = new Set(props.selected);
   const chosen = () => props.pictures.filter((p) => selected.has(p.id));
   /** The one picture the keyboard reaches with Tab: the shown one, else the first. */
@@ -223,6 +240,20 @@ export function Library(props: {
     };
     attempt();
   };
+
+  const remove = (pictures: Picture[]) => {
+    refocus.current = pictures.map((p) => p.id);
+    props.actions.remove(pictures);
+  };
+
+  useEffect(() => {
+    const gone = refocus.current?.every((id) => !places.has(id));
+    const lost = !document.activeElement || document.activeElement === document.body;
+    if (gone && lost && props.shown && places.has(props.shown)) {
+      refocus.current = null;
+      focus(props.shown);
+    }
+  });
 
   /** The pictures from the anchor to `to`, in the library's order. */
   const range = (to: Picture) => {
@@ -279,7 +310,10 @@ export function Library(props: {
       focus(next.id);
     } else if (key === 'Delete' || key === 'Backspace') {
       event.preventDefault();
-      props.actions.remove(chosen());
+      remove(chosen());
+    } else if (key === ' ') {
+      event.preventDefault();
+      props.actions.large(picture);
     } else if (key === 'a' && (event.ctrlKey || event.metaKey)) {
       event.preventDefault();
       props.onSelect(
@@ -392,8 +426,22 @@ export function Library(props: {
             thumbOf(menu.at.key)?.focus();
           }}
         >
-          <PictureMenu pictures={menu.pictures} actions={props.actions} close={() => setMenu(null)} />
+          <PictureMenu
+            pictures={menu.pictures}
+            actions={props.actions}
+            close={() => setMenu(null)}
+            onDetails={(picture) => setDetails({ picture, at: menu.at.element })}
+            onRemove={remove}
+          />
         </MenuSurface>
+      )}
+      {details && (
+        <Details
+          picture={details.picture}
+          anchor={details.at}
+          placement="right-start"
+          onDismiss={() => setDetails(null)}
+        />
       )}
     </div>
   );
