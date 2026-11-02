@@ -2,7 +2,7 @@
   "$schema": "https://hearthscale.com/app.schema.json",
   "id": "image-studio",
   "name": "Image studio",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "api": 6,
   "icon": { "light": "assets/icon-light.svg", "dark": "assets/icon-dark.svg" },
   "description": "Make and change pictures with the image models on this computer.",
