@@ -27,6 +27,8 @@ export interface Abilities {
   /** The most pictures one job draws. */
   count: number;
   strength: number;
+  /** Draws with LoRAs, each with its weight. */
+  loras: boolean;
 }
 
 export function abilitiesOf(card: ModelCard | undefined): Abilities {
@@ -45,6 +47,39 @@ export function abilitiesOf(card: ModelCard | undefined): Abilities {
     guidanceDefault: props.guidance?.default ?? 7,
     count: props.count?.maximum ?? 1,
     strength: props.strength?.default ?? 0.75,
+    loras: 'loras' in props,
+  };
+}
+
+/** A LoRA the person turned on, with how strongly it applies. */
+export interface Lora {
+  id: string;
+  weight: number;
+}
+
+/** The LoRAs turned on that fit an image model, each with its card. */
+export function fitting(card: ModelCard, on: Lora[], adapters: ModelCard[]) {
+  return on.flatMap((lora) => {
+    const adapter = adapters.find((a) => a.id === lora.id && a.fits?.includes(card.id));
+    return adapter ? [{ adapter, weight: lora.weight }] : [];
+  });
+}
+
+/** An image job's input with the LoRAs turned on that fit its model: each
+ *  named with its weight, and their trigger words before the prompt. */
+export function withLoras(
+  input: Record<string, unknown>,
+  card: ModelCard,
+  on: Lora[],
+  adapters: ModelCard[],
+): Record<string, unknown> {
+  const used = fitting(card, on, adapters);
+  if (!abilitiesOf(card).loras || used.length === 0) return input;
+  const triggers = used.flatMap(({ adapter }) => adapter.triggers ?? []);
+  return {
+    ...input,
+    prompt: [...triggers, input.prompt].filter(Boolean).join(', '),
+    loras: used.map(({ adapter, weight }) => ({ adapter: adapter.id, weight })),
   };
 }
 
@@ -63,18 +98,22 @@ export interface Models {
   absentImage: ModelCard[];
   absentUpscale: ModelCard[];
   downloading: ModelCard[];
+  /** The LoRAs on the person's Servers. */
+  adapters: ModelCard[];
 }
 
 export async function readModels(): Promise<Models> {
-  const [image, upscale, chat, absentImage, absentUpscale, downloadingImage, downloadingUpscale] = await Promise.all([
-    call('hearthscale/models/list', { kind: 'image' }),
-    call('hearthscale/models/list', { kind: 'upscale' }),
-    call('hearthscale/models/list', { kind: 'chat' }),
-    call('hearthscale/models/list', { kind: 'image', state: 'absent' }),
-    call('hearthscale/models/list', { kind: 'upscale', state: 'absent' }),
-    call('hearthscale/models/list', { kind: 'image', state: 'downloading' }),
-    call('hearthscale/models/list', { kind: 'upscale', state: 'downloading' }),
-  ]);
+  const [image, upscale, chat, absentImage, absentUpscale, downloadingImage, downloadingUpscale, adapters] =
+    await Promise.all([
+      call('hearthscale/models/list', { kind: 'image' }),
+      call('hearthscale/models/list', { kind: 'upscale' }),
+      call('hearthscale/models/list', { kind: 'chat' }),
+      call('hearthscale/models/list', { kind: 'image', state: 'absent' }),
+      call('hearthscale/models/list', { kind: 'upscale', state: 'absent' }),
+      call('hearthscale/models/list', { kind: 'image', state: 'downloading' }),
+      call('hearthscale/models/list', { kind: 'upscale', state: 'downloading' }),
+      call('hearthscale/models/list', { kind: 'adapter' }),
+    ]);
   const chatCard = chat.chosen.chat?.card;
   const imageChoice = image.chosen.image;
   return {
@@ -87,6 +126,7 @@ export async function readModels(): Promise<Models> {
     absentImage: absentImage.cards,
     absentUpscale: absentUpscale.cards,
     downloading: [...downloadingImage.cards, ...downloadingUpscale.cards],
+    adapters: adapters.cards,
   };
 }
 

@@ -9,6 +9,7 @@ import {
   Popover,
   Slider,
   TextField,
+  ToggleRow,
   anchorFrom,
   useFloatingTips,
   type IconName,
@@ -16,7 +17,8 @@ import {
 } from '@hearthscale/app-ui';
 import { call, fileUrl } from './bridge';
 import { pictureName, type Picture } from './records';
-import type { Abilities } from './models';
+import type { Abilities, Lora } from './models';
+import type { ModelCard } from '@hearthscale/app';
 import { SHAPES, SIZES, STYLES, type ShapeId, type SizeId } from './recipes';
 
 export interface Advanced {
@@ -128,6 +130,68 @@ function ModelSlot() {
   return <span ref={place} className="is-model-slot" />;
 }
 
+/** The LoRAs that fit the image model, each turned on or off with its
+ *  weight, and the way to get more from the Server. */
+function Loras(props: { adapters: ModelCard[]; on: Lora[]; onChange: (on: Lora[]) => void }) {
+  const [at, setAt] = useState<HTMLElement | null>(null);
+  const used = props.on.filter((lora) => props.adapters.some((a) => a.id === lora.id));
+  const flip = (id: string) =>
+    props.onChange(
+      props.on.some((lora) => lora.id === id)
+        ? props.on.filter((lora) => lora.id !== id)
+        : [...props.on, { id, weight: 1 }],
+    );
+  return (
+    <>
+      <button
+        type="button"
+        className="hs-model-trigger hs-hovbox-ink"
+        aria-label="LoRAs"
+        onClick={(e) => setAt(e.currentTarget)}
+      >
+        <Icon name="stack-line" size={14} />
+        <span className="hs-model-trigger-name">
+          {used.length === 0 ? 'No LoRA' : used.length === 1 ? '1 LoRA' : `${used.length} LoRAs`}
+        </span>
+        <Icon name="arrow-down-s-line" size={14} className="hs-model-trigger-chevron" />
+      </button>
+      {at && (
+        <Popover anchor={at} placement="top-start" label="LoRAs" onDismiss={() => setAt(null)}>
+          <div className="is-advanced">
+            {props.adapters.map((adapter) => {
+              const lora = props.on.find((l) => l.id === adapter.id);
+              return (
+                <div key={adapter.id} className="is-lora">
+                  <ToggleRow title={adapter.label} on={!!lora} onFlip={() => flip(adapter.id)} />
+                  {lora && (
+                    <SliderField
+                      label="Strength"
+                      min={0}
+                      max={2}
+                      step={0.05}
+                      value={lora.weight}
+                      onChange={(weight) =>
+                        props.onChange(props.on.map((l) => (l.id === adapter.id ? { ...l, weight } : l)))
+                      }
+                    />
+                  )}
+                </div>
+              );
+            })}
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => void call('hearthscale/ui/open-explore', { kind: 'adapter' })}
+            >
+              Get more LoRAs
+            </Button>
+          </div>
+        </Popover>
+      )}
+    </>
+  );
+}
+
 export function PromptBar(props: {
   words: string;
   onWords: (words: string) => void;
@@ -158,6 +222,10 @@ export function PromptBar(props: {
   onCount: (count: number) => void;
   showCount: boolean;
   comparing: boolean;
+  /** The LoRAs that fit the image model. */
+  adapters: ModelCard[];
+  loras: Lora[];
+  onLoras: (loras: Lora[]) => void;
   advanced: Advanced;
   onAdvanced: (advanced: Advanced) => void;
   onImprove: (() => void) | null;
@@ -301,6 +369,9 @@ export function PromptBar(props: {
               </>
             )}
           </Menu>
+          {props.abilities.loras && !props.comparing && (
+            <Loras adapters={props.adapters} on={props.loras} onChange={props.onLoras} />
+          )}
           {props.showCount && props.abilities.count > 1 && (
             <Menu label="Number of pictures" value={props.count === 1 ? '1 picture' : `${props.count} pictures`}>
               {(close) =>

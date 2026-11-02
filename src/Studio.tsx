@@ -20,7 +20,7 @@ import {
   type Picture,
   type Run,
 } from './records';
-import { abilitiesOf, onDownload, readModels, type Abilities, type Models } from './models';
+import { abilitiesOf, onDownload, readModels, withLoras, type Abilities, type Lora, type Models } from './models';
 import { blobOf, extended, fileName, marginsOf, maskOf, prepared, sizeOf, upload, type Stroke } from './pictures';
 import {
   dimensions,
@@ -54,9 +54,10 @@ interface Prefs {
   style: string | null;
   count: number;
   compare: string[];
+  loras: Lora[];
 }
 
-const PREFS: Prefs = { shape: 'square', size: 'medium', style: null, count: 1, compare: [] };
+const PREFS: Prefs = { shape: 'square', size: 'medium', style: null, count: 1, compare: [], loras: [] };
 
 const LABELS: Record<Action | 'compare', string> = {
   make: 'Make',
@@ -495,7 +496,12 @@ export function Studio() {
     shownBefore.current = shown;
     if (run.action !== 'enlarge') setShown(null);
     setComparing(false);
-    await startRun(run, input, LABELS[run.action]);
+    const card = imageCards.find((c) => c.id === run.model);
+    await startRun(
+      run,
+      run.kind === 'image' && card ? withLoras(input, card, prefs.loras, models?.adapters ?? []) : input,
+      LABELS[run.action],
+    );
   }
 
   async function hold(paths: string[]): Promise<string[]> {
@@ -631,7 +637,16 @@ export function Studio() {
         seed: settings.seed,
         compare: set,
       });
-      await startRun(run, { prompt, ...sized(abilitiesOf(card), width, height), ...settings.input }, LABELS.compare);
+      await startRun(
+        run,
+        withLoras(
+          { prompt, ...sized(abilitiesOf(card), width, height), ...settings.input },
+          card,
+          prefs.loras,
+          models?.adapters ?? [],
+        ),
+        LABELS.compare,
+      );
       await loadCompare(set);
     }
   }
@@ -1088,6 +1103,9 @@ export function Studio() {
             onCount={(count) => setPrefs({ count })}
             showCount={action !== 'erase' && action !== 'extend' && action !== 'compare'}
             comparing={action === 'compare'}
+            adapters={model ? (models?.adapters ?? []).filter((a) => a.fits?.includes(model.id)) : []}
+            loras={prefs.loras}
+            onLoras={(loras) => setPrefs({ loras })}
             advanced={advanced}
             onAdvanced={setAdvanced}
             onImprove={chat ? () => void improve() : null}

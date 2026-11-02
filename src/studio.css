@@ -521,6 +521,12 @@ body {
   flex: 1;
 }
 
+.is-lora {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-row);
+}
+
 /* Pages */
 
 /* The page fills its scroller, so the room under the models reaches down
