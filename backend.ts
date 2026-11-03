@@ -1,4 +1,5 @@
 import type { AppContext, Backend, FolderFire } from '@hearthscale/app';
+import { withText } from './png';
 
 let ctx: AppContext;
 
@@ -41,12 +42,52 @@ async function forgetMissing(): Promise<string[]> {
   return gone;
 }
 
+/** The length of the time a base name starts with, `2026-11-03 14.32 `. */
+const STAMP = 17;
+
+/** The text a picture of a run carries in its file, by PNG keyword. */
+async function textOf(run: string, base: string): Promise<(seed: unknown) => Record<string, string>> {
+  const [made] = await ctx.db.query('SELECT * FROM runs WHERE id = ?', [run]);
+  const loras = await ctx.db.query('SELECT label, weight FROM run_loras WHERE run = ? ORDER BY idx', [run]);
+  const [source] = made.source
+    ? await ctx.db.query('SELECT path FROM pictures WHERE id = ?', [made.source])
+    : [undefined];
+  const fields: Record<string, unknown> = {
+    action: made.action,
+    model: made.label,
+    modelId: made.model,
+    prompt: made.prompt,
+    negativePrompt: made.negative,
+    style: made.style,
+    width: made.width,
+    height: made.height,
+    steps: made.steps,
+    guidance: made.guidance,
+    strength: made.strength,
+    loras: loras.length ? loras : null,
+    source: source ? String(source.path).slice(String(source.path).lastIndexOf('/') + 1) : null,
+  };
+  const given = (value: unknown) => value !== null && value !== undefined && value !== '';
+  return (seed) => ({
+    Title: base.slice(STAMP),
+    ...(given(made.prompt) ? { Description: String(made.prompt) } : {}),
+    Software: `Hearthscale Image studio ${ctx.app.version}`,
+    'Creation Time': new Date(Number(made.made)).toUTCString(),
+    'Image studio': JSON.stringify(Object.fromEntries(Object.entries({ ...fields, seed }).filter(([, v]) => given(v)))),
+  });
+}
+
 /** Moves the pictures of a run out of its folder to `pictures/<base>.png`,
  *  numbered when the run made more than one, with "(2)" and up where a
- *  file of that name exists. */
+ *  file of that name exists. With the `metadata` setting on, each file
+ *  keeps the runtime's `parameters` text and gains the run's own; with it
+ *  off, the file carries no text at all. */
 async function nameRun(run: string, base: string): Promise<number> {
-  const rows = await ctx.db.query('SELECT id, path FROM pictures WHERE run = ? ORDER BY idx', [run]);
+  const rows = await ctx.db.query('SELECT id, path, seed FROM pictures WHERE run = ? ORDER BY idx', [run]);
   const taken = new Set((await ctx.fs.list({ root: 'data', path: PICTURES })).files.map((name) => name.toLowerCase()));
+  const { metadata } = (await ctx.settings.get()) as { metadata: boolean };
+  const text = metadata ? await textOf(run, base) : () => ({});
+  const keep = new Set(metadata ? ['parameters'] : []);
   let moved = 0;
   for (const [index, row] of rows.entries()) {
     const from = String(row.path);
@@ -56,8 +97,10 @@ async function nameRun(run: string, base: string): Promise<number> {
     for (let copy = 2; taken.has(name.toLowerCase()); copy++) name = `${stem} (${copy}).png`;
     taken.add(name.toLowerCase());
     const to = `${PICTURES}/${name}`;
-    await ctx.fs.rename({ root: 'data', path: from }, to);
+    const png = await ctx.fs.readBytes({ root: 'data', path: from });
+    await ctx.fs.writeBytes({ root: 'data', path: to }, withText(png, keep, text(row.seed)));
     await ctx.db.exec('UPDATE pictures SET path = ? WHERE id = ?', [to, row.id]);
+    await ctx.fs.remove({ root: 'data', path: from });
     moved++;
   }
   await removeIfEmpty(folderOf(run));
