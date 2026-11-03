@@ -44,11 +44,13 @@ as an asset a job takes (`ctx.assets.import`).
   `pictures/<date> <time> <name>.png`. The name is the prompt when it is at
   most 40 characters; a longer prompt gets a short name from the app's chat
   model, or else its first words. With the `metadata` setting on (the
-  default), each file keeps the runtime's `parameters` text and gets iTXt
-  chunks `Title`, `Description` (the prompt), `Software`, `Creation Time`
-  and `Image studio` (the run as JSON: model, size, steps, guidance, seed,
-  strength, style, LoRAs, the picture it came from); with it off, the file
-  carries no text at all (`png.ts`).
+  default), each file carries plain words only: `Title`, `Description` (the
+  prompt), `Comment` (one line per setting: prompt, style, model, size,
+  steps, guidance, seed, strength, LoRAs, the picture it came from, the
+  action), `Software`, `Creation Time`, the runtime's `parameters` line
+  without its JSON, and an XMP packet with the same title, prompt and lines,
+  which Windows shows as Title, Comments, Program name and Date taken. With
+  it off, the file carries no text at all (`png.ts`).
 - `remove` deletes picture files. It is the one mutating tool.
 - `tidy` forgets the pictures whose files are gone, such as files deleted
   outside the app. The view calls it when it opens, and the `pictures` folder
