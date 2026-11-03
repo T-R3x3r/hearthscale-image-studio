@@ -2,7 +2,7 @@
   "$schema": "https://hearthscale.com/app.schema.json",
   "id": "image-studio",
   "name": "Image studio",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "api": 6,
   "icon": { "light": "assets/icon-light.svg", "dark": "assets/icon-dark.svg" },
   "description": "Make and change pictures with the image models on this computer.",
@@ -10,7 +10,8 @@
   "categories": ["design"],
   "payment": "free",
   "environment": { "kind": "process" },
-  "uses": ["jobs", "models", "db", "store", "files.open"],
+  "uses": ["jobs", "models", "db", "store", "files.open", "events"],
+  "triggers": [{ "name": "pictures", "kind": "folder" }],
   "models": {
     "image": { "required": true },
     "upscale": { "required": false },
@@ -134,6 +135,15 @@
         },
         "required": ["asset", "run"]
       },
+      "mutating": false,
+      "outbound": false,
+      "visibility": ["app"]
+    },
+    {
+      "name": "tidy",
+      "title": "Check the library",
+      "description": "Forgets the pictures of the library whose files are gone.",
+      "input": { "type": "object", "properties": {} },
       "mutating": false,
       "outbound": false,
       "visibility": ["app"]

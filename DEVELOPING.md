@@ -25,7 +25,7 @@ library stays external, because Hearthscale gives every view its own copy.
 | Part        | What it does                                                                                       |
 | ----------- | -------------------------------------------------------------------------------------------------- |
 | The view    | All of the interface: the library, the stage, the prompt and Compare. Hearthscale draws the model picker in a model slot of the prompt. |
-| The backend | Five tools only the view calls: `make`, `hold`, `release`, `keep` and `remove`.                     |
+| The backend | Six tools only the view calls: `make`, `hold`, `release`, `keep`, `remove` and `tidy`, and a folder trigger on `pictures/`. |
 
 The backend exists because only it can save a job's pictures into the app's
 data folder (`save` of `ctx.jobs.submit`) and read a picture of that folder
@@ -41,6 +41,10 @@ as an asset a job takes (`ctx.assets.import`).
   `release` drops those assets once the job has ended.
 - `keep` writes a picture the person opened into the library.
 - `remove` deletes picture files. It is the one mutating tool.
+- `tidy` forgets the pictures whose files are gone, such as files deleted
+  outside the app. The view calls it when it opens, and the `pictures` folder
+  trigger calls it when a file of `pictures/` is removed. It sends the ids it
+  forgot to the views as the event `gone`.
 
 ## Where things live
 

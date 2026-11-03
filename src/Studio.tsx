@@ -327,6 +327,7 @@ export function Studio() {
   useEffect(() => {
     void (async () => {
       await openLibrary();
+      await tool('tidy', {});
       const view = hostContext()['hearthscale/widgetState'] as ViewState | null | undefined;
       if (view) {
         setPage(view.page);
@@ -862,23 +863,45 @@ export function Studio() {
     }
   }
 
+  /** Lets go of pictures that left the library: the picture shown moves to
+   *  the next one, and every other place that holds one drops it. */
+  async function dropped(ids: Set<string>) {
+    const kept = (p: Picture) => !ids.has(p.id);
+    if (source && ids.has(source.id)) setSource(null);
+    setReferences((before) => before.filter(kept));
+    setStrip((before) => before.filter(kept));
+    setSelected((before) => before.filter((id) => !ids.has(id)));
+    setLarge((before) => {
+      const items = before?.items.filter(kept);
+      return items?.length ? { items, start: Math.min(before!.start, items.length - 1) } : null;
+    });
+    if (shown && ids.has(shown.id)) {
+      const at = pictures.findIndex((p) => p.id === shown.id);
+      const next =
+        at < 0 ? strip.find(kept) : (pictures.slice(at + 1).find(kept) ?? pictures.slice(0, at).reverse().find(kept));
+      await show(next ?? null);
+    }
+    await refreshLibrary();
+    if (compareSetRef.current) await loadCompare(compareSetRef.current);
+  }
+  const droppedRef = useRef(dropped);
+  droppedRef.current = dropped;
+
+  useEffect(
+    () =>
+      on('hearthscale/events/event', ({ name, data }) => {
+        if (name === 'gone') void droppedRef.current(new Set(data as string[]));
+      }),
+    [],
+  );
+
   async function remove(gone: Picture[]) {
     setDeleting(null);
     const ids = new Set(gone.map((p) => p.id));
-    const kept = (p: Picture) => !ids.has(p.id);
     try {
       await tool('remove', { paths: gone.map((p) => p.path) }, 'Delete');
       await forgetPictures([...ids]);
-      if (source && ids.has(source.id)) setSource(null);
-      setReferences((before) => before.filter(kept));
-      setStrip((before) => before.filter(kept));
-      if (shown && ids.has(shown.id)) {
-        const at = pictures.findIndex((p) => p.id === shown.id);
-        const next =
-          at < 0 ? strip.find(kept) : (pictures.slice(at + 1).find(kept) ?? pictures.slice(0, at).reverse().find(kept));
-        await show(next ?? null);
-      }
-      await refreshLibrary();
+      await dropped(ids);
     } catch (error) {
       failed(gone.length === 1 ? 'The picture was not deleted.' : 'The pictures were not deleted.', () => remove(gone))(
         error,
