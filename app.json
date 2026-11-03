@@ -2,7 +2,7 @@
   "$schema": "https://hearthscale.com/app.schema.json",
   "id": "image-studio",
   "name": "Image studio",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "api": 6,
   "icon": { "light": "assets/icon-light.svg", "dark": "assets/icon-dark.svg" },
   "description": "Make and change pictures with the image models on this computer.",
@@ -99,7 +99,7 @@
         "properties": {
           "paths": {
             "type": "array",
-            "items": { "type": "string", "pattern": "^pictures/[a-z0-9-]+/[a-z0-9-]+\\.png$" },
+            "items": { "type": "string", "pattern": "^pictures/([a-z0-9-]+/)?[^/\\\\:*?\"<>|]+\\.png$" },
             "minItems": 1,
             "maxItems": 11
           }
@@ -140,6 +140,22 @@
       "visibility": ["app"]
     },
     {
+      "name": "name",
+      "title": "Name pictures",
+      "description": "Moves the pictures of a run out of its folder, under a name a person can read.",
+      "input": {
+        "type": "object",
+        "properties": {
+          "run": { "type": "string", "pattern": "^[a-z0-9-]{8,40}$" },
+          "base": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}\\.[0-9]{2} [^/\\\\:*?\"<>|]{1,60}$" }
+        },
+        "required": ["run", "base"]
+      },
+      "mutating": false,
+      "outbound": false,
+      "visibility": ["app"]
+    },
+    {
       "name": "tidy",
       "title": "Check the library",
       "description": "Forgets the pictures of the library whose files are gone.",
@@ -157,7 +173,7 @@
         "properties": {
           "paths": {
             "type": "array",
-            "items": { "type": "string", "pattern": "^pictures/[a-z0-9-]+/[a-z0-9-]+\\.png$" },
+            "items": { "type": "string", "pattern": "^pictures/([a-z0-9-]+/)?[^/\\\\:*?\"<>|]+\\.png$" },
             "minItems": 1
           }
         },

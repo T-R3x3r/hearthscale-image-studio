@@ -25,7 +25,7 @@ library stays external, because Hearthscale gives every view its own copy.
 | Part        | What it does                                                                                       |
 | ----------- | -------------------------------------------------------------------------------------------------- |
 | The view    | All of the interface: the library, the stage, the prompt and Compare. Hearthscale draws the model picker in a model slot of the prompt. |
-| The backend | Six tools only the view calls: `make`, `hold`, `release`, `keep`, `remove` and `tidy`, and a folder trigger on `pictures/`. |
+| The backend | Seven tools only the view calls: `make`, `hold`, `release`, `keep`, `name`, `remove` and `tidy`, and a folder trigger on `pictures/`. |
 
 The backend exists because only it can save a job's pictures into the app's
 data folder (`save` of `ctx.jobs.submit`) and read a picture of that folder
@@ -40,6 +40,10 @@ as an asset a job takes (`ctx.assets.import`).
 - `hold` makes a library picture an asset for a job or for a chat model, and
   `release` drops those assets once the job has ended.
 - `keep` writes a picture the person opened into the library.
+- `name` moves the pictures of a finished run out of its folder to
+  `pictures/<date> <time> <name>.png`. The name is the prompt when it is at
+  most 40 characters; a longer prompt gets a short name from the app's chat
+  model, or else its first words.
 - `remove` deletes picture files. It is the one mutating tool.
 - `tidy` forgets the pictures whose files are gone, such as files deleted
   outside the app. The view calls it when it opens, and the `pictures` folder
@@ -50,7 +54,7 @@ as an asset a job takes (`ctx.assets.import`).
 
 | What                                  | Where                                                                  |
 | ------------------------------------- | ---------------------------------------------------------------------- |
-| Pictures                              | PNG files in the data folder, `pictures/<run id>/image-<n>.png`         |
+| Pictures                              | PNG files in the data folder, `pictures/2026-11-03 14.32 Red fox at dawn.png` |
 | Runs and pictures                     | The app's SQLite database, tables `runs` and `pictures` (`src/records.ts`) |
 | The person's choices                  | The store, key `prefs`                                                  |
 | Masks, uploads, pictures a job reads  | Assets of the app, released when the job ends                           |

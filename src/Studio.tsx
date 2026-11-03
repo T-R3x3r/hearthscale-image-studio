@@ -42,6 +42,7 @@ import {
   type ShapeId,
   type SizeId,
 } from './recipes';
+import { LONGEST, shortName, stamp } from './names';
 import { cancelRun, newId, onEnded, recoverRuns, startRun, useLive } from './runs';
 import { Library, type LibraryActions } from './Library';
 import { Stage, StageBar, type Mode, type PictureActions, type Sides, type StageProps, type Tool } from './Stage';
@@ -106,6 +107,8 @@ const EXAMPLES: Record<Exclude<Action, 'enlarge' | 'open'> | 'compare', string> 
 
 const IMPROVE =
   'You turn a short idea for a picture into one prompt for an image model. Name the subject, the setting, the light and the look in plain words. Answer with the prompt alone, in at most 60 words, with no quotes.';
+const NAME =
+  "You name a picture's file. Answer with a name of two to five words that says what the picture shows, taken from the prompt it was made with. Answer with the name alone, with no quotes and no full stop.";
 const DESCRIBE =
   'Describe this picture as one prompt for an image model: the subject, the setting, the light and the look. Answer with the prompt alone, in at most 60 words, with no quotes.';
 
@@ -378,6 +381,7 @@ export function Studio() {
           }
         }
         if (compareSetRef.current) await loadCompare(compareSetRef.current);
+        if (outcome === 'done') await namedRef.current(id);
       }),
     [refreshLibrary, show, loadCompare],
   );
@@ -754,6 +758,8 @@ export function Studio() {
       const { path } = await tool<{ path: string }>('keep', { asset, run: run.id }, 'Open picture');
       await addRun(run);
       await finishRun(run, [{ path, seed: null }], Date.now());
+      const title = file instanceof File ? shortName(file.name.replace(/\.[^.]*$/, '')) : '';
+      await tool('name', { run: run.id, base: `${stamp(run.made)} ${title || 'Opened picture'}` });
       const picture = (await picturesOfRun(run.id))[0];
       await refreshLibrary();
       if (source && abilities.edit) setReferences((before) => [...before, picture].slice(0, 9));
@@ -886,6 +892,45 @@ export function Studio() {
   }
   const droppedRef = useRef(dropped);
   droppedRef.current = dropped;
+
+  /** The words a finished run's files are named by: its prompt, or a short
+   *  name the chat model gives a long prompt. */
+  async function titleOf(run: Run): Promise<string> {
+    const plain = shortName(run.prompt);
+    if (!chat || run.prompt.trim().length <= LONGEST) return plain;
+    try {
+      return shortName(await complete(run.prompt.trim(), NAME)) || plain;
+    } catch {
+      return plain;
+    }
+  }
+
+  /** Moves a finished run's pictures to files named by when and what they
+   *  are, and shows them at their new paths. */
+  async function named(id: string) {
+    const run = await getRun(id);
+    if (!run) return;
+    try {
+      const title = (await titleOf(run)) || (run.action === 'enlarge' ? 'Enlarged picture' : 'Picture');
+      await tool('name', { run: id, base: `${stamp(run.made)} ${title}` });
+    } catch (error) {
+      failed('The picture was not named.', null)(error);
+      return;
+    }
+    const fresh = new Map((await picturesOfRun(id)).map((p) => [p.id, p]));
+    const swap = (p: Picture) => fresh.get(p.id) ?? p;
+    setShown((before) => before && swap(before));
+    setShownFrom((before) => before && swap(before));
+    setComparing((before) => before && { ...before, before: swap(before.before) });
+    setSource((before) => before && swap(before));
+    setStrip((before) => before.map(swap));
+    setReferences((before) => before.map(swap));
+    setLarge((before) => before && { ...before, items: before.items.map(swap) });
+    await refreshLibrary();
+    if (compareSetRef.current) await loadCompare(compareSetRef.current);
+  }
+  const namedRef = useRef(named);
+  namedRef.current = named;
 
   useEffect(
     () =>
