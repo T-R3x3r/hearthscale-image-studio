@@ -2,7 +2,7 @@ import { App, PostMessageTransport, type McpUiHostContext } from '@modelcontextp
 import { hostCall } from '@hearthscale/app/view';
 import type { ViewExtensionNotification, ViewHostContext } from '@hearthscale/app';
 
-export const app = new App({ name: 'Image studio', version: '0.2.3' }, {}, { autoResize: false });
+export const app = new App({ name: 'Image studio', version: '0.2.4' }, {}, { autoResize: false });
 
 /** A typed call of every `hearthscale/*` method the view may make. */
 export const call = hostCall(app);
@@ -31,7 +31,7 @@ export async function tool<T>(name: string, args: Record<string, unknown>, label
   return result.structuredContent as T;
 }
 
-type Notification = ViewExtensionNotification;
+type Notification = ViewExtensionNotification | { method: 'hearthscale/ui/history'; params: { direction: 'back' | 'forward' } };
 type Listener<M extends Notification['method']> = (params: Extract<Notification, { method: M }>['params']) => void;
 const listeners = new Map<string, Set<(params: unknown) => void>>();
 

@@ -52,6 +52,17 @@ import { ProblemNotice, type Problem } from './Problem';
 
 type Page = 'studio' | 'compare';
 
+/** Where a step back or forward can land. */
+interface Place {
+  section: 'all' | 'favourites' | 'compare';
+  picture: string | null;
+}
+
+const samePlace = (a: Place, b: Place) => a.section === b.section && a.picture === b.picture;
+
+/** The stage's place while a run has no picture to show yet. It is never kept as a step. */
+const MAKING = 'making';
+
 /** What a view of the tab shows again after it loads anew. */
 interface ViewState {
   page: Page;
@@ -288,6 +299,10 @@ export function Studio() {
   /** What starts each run again, by the run's id. */
   const agains = useRef(new Map<string, () => Promise<unknown>>());
   const compareSetRef = useRef<string | null>(null);
+  const places = useRef<{ back: Place[]; forward: Place[] }>({ back: [], forward: [] });
+  const here = useRef<Place>({ section: 'all', picture: null });
+  /** True from a move that adds no step until the place has changed. */
+  const quiet = useRef(false);
   const live = useLive();
   const locale = hostContext().locale ?? navigator.language;
   const tips = useFloatingTips('right');
@@ -1125,6 +1140,67 @@ export function Studio() {
   const away = () => {
     if (cramped) setFolded(true);
   };
+  const newPicture = () => {
+    setPage('studio');
+    setSource(null);
+    setReferences([]);
+    void show(null);
+    setStripRun(null);
+    setStrip([]);
+  };
+
+  /** What opens a place, or null where its picture is gone. */
+  async function opening(to: Place): Promise<(() => void) | null> {
+    if (to.section === 'compare') return () => setPage('compare');
+    const picture = to.picture ? await getPicture(to.picture) : null;
+    if (to.picture && !picture) return null;
+    return () => {
+      setFavourites(to.section === 'favourites');
+      if (!picture) return newPicture();
+      setPage('studio');
+      void show(picture);
+    };
+  }
+
+  async function walk(direction: 'back' | 'forward') {
+    if (quiet.current) return;
+    quiet.current = true;
+    const other = direction === 'back' ? 'forward' : 'back';
+    const list = places.current;
+    while (list[direction].length) {
+      const to = list[direction].pop()!;
+      const open = samePlace(to, here.current) ? null : await opening(to);
+      if (!open) continue;
+      if (here.current.picture !== MAKING) list[other].push(here.current);
+      away();
+      open();
+      return;
+    }
+    quiet.current = false;
+  }
+
+  useEffect(() =>
+    on('hearthscale/ui/history', ({ direction }) => {
+      void walk(direction).catch((error) => {
+        quiet.current = false;
+        failed(UNDONE.open, null)(error);
+      });
+    }),
+  );
+
+  const section = page === 'compare' ? 'compare' : favourites ? 'favourites' : 'all';
+  const onStage = section === 'compare' ? null : (shown?.id ?? (stripRun?.status === 'making' ? MAKING : null));
+
+  useEffect(() => {
+    const left = here.current;
+    here.current = { section, picture: onStage };
+    if (!opened || samePlace(left, here.current)) return;
+    if (quiet.current) quiet.current = false;
+    else if (left.picture !== MAKING) {
+      places.current.back.push(left);
+      places.current.forward = [];
+    }
+  }, [opened, section, onStage]);
 
   useEffect(() => {
     void call('hearthscale/ui/cover', { covered: covering });
@@ -1156,19 +1232,15 @@ export function Studio() {
             onSelect={(ids, picture) => {
               setSelected(ids);
               if (!picture) return;
+              if (ids.length > 1 && picture.id !== shown?.id) quiet.current = true;
               setPage('studio');
               void show(picture);
             }}
             onOpen={away}
             onNew={() => {
               away();
-              setPage('studio');
-              setSource(null);
-              setReferences([]);
               setWords('');
-              void show(null);
-              setStripRun(null);
-              setStrip([]);
+              newPicture();
             }}
             onPage={(next) => (away(), setPage(next))}
           />
