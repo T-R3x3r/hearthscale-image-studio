@@ -31,7 +31,8 @@ export async function tool<T>(name: string, args: Record<string, unknown>, label
   return result.structuredContent as T;
 }
 
-type Notification = ViewExtensionNotification | { method: 'hearthscale/ui/history'; params: { direction: 'back' | 'forward' } };
+type Notification =
+  ViewExtensionNotification | { method: 'hearthscale/ui/history'; params: { direction: 'back' | 'forward' } };
 type Listener<M extends Notification['method']> = (params: Extract<Notification, { method: M }>['params']) => void;
 const listeners = new Map<string, Set<(params: unknown) => void>>();
 
