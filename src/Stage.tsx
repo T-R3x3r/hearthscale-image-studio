@@ -252,8 +252,8 @@ export interface StageProps {
   /** Why no image model can run, where no Server offers one to install. */
   unavailable: string | null;
   onRetry: () => void;
-  /** The image model the Server suggests when none is there, or the one it downloads. */
-  suggestion: { label: string; downloading: boolean } | null;
+  /** The image model recommended for the device when none is there, or the one on its way. */
+  suggestion: { label: string; downloading: boolean; license?: string } | null;
   onInstall: () => void;
   onIdea: (words: string) => void;
   tool: Tool;
@@ -292,6 +292,10 @@ export function Stage(props: StageProps) {
   const box = useFit(area, framed?.width ?? 0, framed?.height ?? 0);
   const waiting = tips('waiting', props.live?.waiting ?? undefined);
   const runsOn = tips('model', props.liveModel ? `With ${props.liveModel}` : undefined);
+  const license = tips(
+    'license',
+    props.suggestion?.license ? `${props.suggestion.license} limits commercial use` : undefined,
+  );
 
   let body;
   if (props.comparing && picture) {
@@ -370,9 +374,12 @@ export function Stage(props: StageProps) {
       <EmptyState icon={<Icon name="image-ai-line" size={30} />} title={`Downloading ${props.suggestion.label}…`} />
     ) : props.suggestion ? (
       <EmptyState icon={<Icon name="image-ai-line" size={30} />} title="No image model">
-        <Button variant="secondary" icon={<Icon name="download-2-line" size={14} />} onClick={props.onInstall}>
-          Install {props.suggestion.label}
-        </Button>
+        <span {...license.hover} className="is-tipwrap">
+          <Button variant="secondary" icon={<Icon name="download-2-line" size={14} />} onClick={props.onInstall}>
+            Install {props.suggestion.label}
+          </Button>
+          {license.tip}
+        </span>
       </EmptyState>
     ) : (
       <ProblemNotice

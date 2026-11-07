@@ -90,20 +90,23 @@ export interface Models {
   unavailable: string | null;
   /** The upscale model the platform picks for the app. */
   upscaleChosen: string | null;
+  /** The models recommended for the device that a Server does not hold yet, the first recommendation first. */
   absentImage: ModelCard[];
   absentUpscale: ModelCard[];
   downloading: ModelCard[];
   adapters: ModelCard[];
 }
 
+const isAbsent = (card: ModelCard) => card.state === 'absent';
+
 export async function readModels(): Promise<Models> {
-  const [image, upscale, chat, absentImage, absentUpscale, downloadingImage, downloadingUpscale, adapters] =
+  const [image, upscale, chat, recommendedImage, recommendedUpscale, downloadingImage, downloadingUpscale, adapters] =
     await Promise.all([
       call('hearthscale/models/list', { kind: 'image' }),
       call('hearthscale/models/list', { kind: 'upscale' }),
       call('hearthscale/models/list', { kind: 'chat' }),
-      call('hearthscale/models/list', { kind: 'image', state: 'absent' }),
-      call('hearthscale/models/list', { kind: 'upscale', state: 'absent' }),
+      call('hearthscale/models/recommended', { kind: 'image' }),
+      call('hearthscale/models/recommended', { kind: 'upscale' }),
       call('hearthscale/models/list', { kind: 'image', state: 'downloading' }),
       call('hearthscale/models/list', { kind: 'upscale', state: 'downloading' }),
       call('hearthscale/models/list', { kind: 'adapter' }),
@@ -117,8 +120,8 @@ export async function readModels(): Promise<Models> {
     chosen: imageChoice?.card ?? null,
     unavailable: imageChoice && 'reason' in imageChoice ? imageChoice.reason : null,
     upscaleChosen: upscale.chosen.upscale?.card ?? null,
-    absentImage: absentImage.cards,
-    absentUpscale: absentUpscale.cards,
+    absentImage: recommendedImage.cards.filter(isAbsent),
+    absentUpscale: recommendedUpscale.cards.filter(isAbsent),
     downloading: [...downloadingImage.cards, ...downloadingUpscale.cards],
     adapters: adapters.cards,
   };

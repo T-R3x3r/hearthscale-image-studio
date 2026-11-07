@@ -1099,7 +1099,11 @@ export function Studio() {
     unavailable: models?.unavailable ?? null,
     onRetry: () => void refreshModels(),
     suggestion: suggestedImage
-      ? { label: suggestedImage.label, downloading: suggestedImage.state === 'downloading' }
+      ? {
+          label: suggestedImage.label,
+          downloading: suggestedImage.state === 'downloading',
+          license: suggestedImage.limitingLicense,
+        }
       : null,
     onInstall: () => {
       if (!suggestedImage) return;

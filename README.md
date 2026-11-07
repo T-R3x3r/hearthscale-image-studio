@@ -1,11 +1,10 @@
 # Image studio
 
-Make and change pictures with image models that run on your own computer.
+Make and change pictures with image models on your own device.
 
-Write what you want to see and choose **Make**. Image studio draws it on your
-computer, or on a Hearthscale Server you paired with it, and keeps every
-picture in its library. Your words and pictures go only to your own
-Hearthscale Servers.
+Write what you want to see and choose **Make**. The picture is made on your
+device, or on a Hearthscale Server you paired with it, and stays in your
+library. Your words and pictures go only to your own Hearthscale Servers.
 
 ## What you can do
 
@@ -20,21 +19,20 @@ Hearthscale Servers.
 - **Compare** two to four models on the same words, side by side.
 - Keep favourites, search your library, and save or copy any picture.
 
-Your pictures stay on your computer, in Image studio's own folder.
+Your pictures stay on your device, in Image studio's own folder.
 
 ## What you need
 
-- **Hearthscale**, with its Server on this computer or on a computer you
-  paired.
-- **An image model.** The first time you open Image studio, its introduction
-  offers FLUX.2 klein 4B, about 5 GB, and Hearthscale downloads it for you. To
-  use another model, open the model picker under the prompt: it lists the
-  models your Servers have, and **Get more models** opens the Server, where
-  you can find and download more.
+- **Hearthscale**, with a Server on this device or on a device you paired.
+- **An image model.** The first time you open Image studio, the introduction
+  offers the image model recommended for your device. To use another model,
+  open the model picker under the prompt. The picker lists the models on your
+  Servers, and **Get more models** opens the Server, where you can find and
+  download more.
 - **An upscale model** for Enlarge. When there is none, Enlarge offers the
-  one your Server suggests.
-- **A chat model** is optional. With one, Image studio can improve your words
-  and describe a picture.
+  model recommended for your device.
+- **A chat model** is optional. With one, you can improve your words and
+  describe a picture.
 
 ## Price
 

@@ -2,10 +2,10 @@
   "$schema": "https://hearthscale.com/app.schema.json",
   "id": "image-studio",
   "name": "Image studio",
-  "version": "0.2.4",
-  "api": 6,
+  "version": "0.2.5",
+  "api": 7,
   "icon": { "light": "assets/icon-light.svg", "dark": "assets/icon-dark.svg" },
-  "description": "Make and change pictures with the image models on this computer.",
+  "description": "Make and change pictures with the image models on this device.",
   "license": "MIT",
   "categories": ["design"],
   "payment": "free",
@@ -36,17 +36,9 @@
     "cards": [
       {
         "title": "Pictures from words.",
-        "text": "Describe a picture, and Image studio makes it. Every picture stays in your library.",
+        "text": "Describe what you want to see. Every picture stays in your library. This model is recommended for your device.",
         "image": "assets/intro.png",
-        "download": {
-          "kind": "image",
-          "repo": "leejet/FLUX.2-klein-4B-GGUF",
-          "file": "flux-2-klein-4b-Q4_0.gguf",
-          "companions": [
-            { "role": "vae", "repo": "Comfy-Org/Flux-2-Klein-4B", "file": "split_files/vae/flux2-vae.safetensors" },
-            { "role": "llm", "repo": "unsloth/Qwen3-4B-GGUF", "file": "Qwen3-4B-Q4_K_M.gguf" }
-          ]
-        }
+        "download": { "best": "image" }
       },
       {
         "title": "Make, then change.",
