@@ -17,6 +17,8 @@ export interface Abilities {
   edit: boolean;
   /** Takes a width and a height. */
   size: boolean;
+  /** The side of a square of the area the model draws at first. */
+  side: number;
   negative: boolean;
   seed: boolean;
   steps: boolean;
@@ -30,6 +32,9 @@ export interface Abilities {
   loras: boolean;
 }
 
+/** The side of the square a model that states no size draws at first. */
+const SIDE = 1024;
+
 export function abilitiesOf(card: ModelCard | undefined): Abilities {
   const input = card?.jobs?.image?.input as { properties?: Record<string, Property> } | undefined;
   const props = input?.properties ?? {};
@@ -38,6 +43,7 @@ export function abilitiesOf(card: ModelCard | undefined): Abilities {
     fill: 'mask' in props,
     edit: 'references' in props,
     size: 'width' in props && 'height' in props,
+    side: Math.sqrt((props.width?.default ?? SIDE) * (props.height?.default ?? SIDE)),
     negative: 'negativePrompt' in props,
     seed: 'seed' in props,
     steps: 'steps' in props,

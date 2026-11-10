@@ -583,7 +583,7 @@ export function Studio() {
 
   async function make() {
     const { prompt, avoid } = withStyle(words.trim(), prefs.style);
-    const { width, height } = dimensions(prefs.shape, prefs.size);
+    const { width, height } = dimensions(prefs.shape, prefs.size, abilities.side);
     const settings = shared(abilities, advanced, avoid, prefs.count);
     const run = newRun({
       kind: 'image',
@@ -685,10 +685,10 @@ export function Studio() {
     const set = newId();
     const seed = Math.floor(Math.random() * 2 ** 31);
     const { prompt, avoid } = withStyle(words.trim(), prefs.style);
-    const { width, height } = dimensions(prefs.shape, prefs.size);
     setProblem(null);
     setCompareSet(set);
     for (const card of imageCards.filter((c) => prefs.compare.includes(c.id))) {
+      const { width, height } = dimensions(prefs.shape, prefs.size, abilitiesOf(card).side);
       const settings = shared(abilitiesOf(card), { ...advanced, seed: String(seed) }, avoid, 1);
       const run = newRun({
         kind: 'image',
@@ -840,7 +840,7 @@ export function Studio() {
     });
     const fit = SHAPES.flatMap((shape) => SIZES.map((size) => ({ shape: shape.id, size: size.id }))).find(
       ({ shape, size }) => {
-        const d = dimensions(shape, size);
+        const d = dimensions(shape, size, abilities.side);
         return d.width === run.width && d.height === run.height;
       },
     );

@@ -7,20 +7,21 @@ export const SHAPES = [
 ] as const;
 export type ShapeId = (typeof SHAPES)[number]['id'];
 
-/** The sizes a picture takes: the side of a square of the same area. */
+/** The sizes a picture takes: the side of a square of the same area, as a
+ *  share of the side of the square a model draws at first. */
 export const SIZES = [
-  { id: 'small', label: 'Small', side: 512 },
-  { id: 'medium', label: 'Medium', side: 768 },
-  { id: 'large', label: 'Large', side: 1024 },
+  { id: 'small', label: 'Small', share: 0.5 },
+  { id: 'medium', label: 'Medium', share: 0.75 },
+  { id: 'large', label: 'Large', share: 1 },
 ] as const;
 export type SizeId = (typeof SIZES)[number]['id'];
 
-/** The width and height of a shape at a size, both multiples of 64: the
- *  short side nearest the one that keeps the area, the long side the
- *  largest that keeps the area at or under the square's. */
-export function dimensions(shape: ShapeId, size: SizeId): { width: number; height: number } {
+/** The width and height of a shape at a size of a model's side, both
+ *  multiples of 64: the short side nearest the one that keeps the area, the
+ *  long side the largest that keeps the area at or under the square's. */
+export function dimensions(shape: ShapeId, size: SizeId, model: number): { width: number; height: number } {
   const { ratio } = SHAPES.find((s) => s.id === shape)!;
-  const side = SIZES.find((s) => s.id === size)!.side;
+  const side = SIZES.find((s) => s.id === size)!.share * model;
   const area = side * side;
   const short = Math.max(64, Math.round(Math.sqrt(area * Math.min(ratio, 1 / ratio)) / 64) * 64);
   const long = Math.max(short, Math.floor(area / short / 64) * 64);
