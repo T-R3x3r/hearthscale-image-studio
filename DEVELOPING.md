@@ -127,9 +127,14 @@ the colours were first used (`changeAreas` in `src/Studio.tsx`, `runSteps` in
 `src/runs.ts`):
 
 1. The job takes the current picture as `image`, the area's marks as `mask`
-   (white where it draws anew), `strength` 1, and, where the schema has
-   `references`, the current picture and the area's pictures as
-   `references`.
+   (white where it draws anew) and `strength` 1, with the prompt of
+   `areaPrompt`. Where the schema has `references`, picture 1 of
+   `references` is the current picture, and the area's pictures follow it.
+   For an area with words or pictures, picture 1 shows the area filled in
+   its marker's plain colour (`paintedWith`), and the prompt says to replace
+   the area of that colour. For an area to remove, picture 1 is the picture
+   as it is, and the prompt names what goes: objects, people, text and
+   interface parts in front of the scene.
 2. The view reads the job's picture and lays it into the current picture by
    the area's blend (`blendOf`): nothing outside the marks, all of it deeper
    inside the marks than the soft edge, and a smooth rise in between, from a
@@ -155,6 +160,13 @@ shape and the size the person picks (`src/recipes.ts`), multiples of 64.
 - A job's `mask` must be the size of its `image`, and both multiples of 64. A
   picture the person opens is cut to multiples of 64 when it comes in
   (`src/pictures.ts`).
+- A model that follows reference pictures, such as FLUX.2 klein, draws in
+  the mask what picture 1 of `references` shows there: with the plain
+  picture it draws the old content again, and with no references at all it
+  fills the mask with a flat colour. So an area to change is painted over
+  in picture 1, and an area to remove keeps picture 1 plain.
+- The soft edge lies inside the marks, so a mark drawn tight around a
+  thing to remove lets its edge show faintly. Mark a little past it.
 - A canvas changes a picture's pixels unless the picture is decoded with
   `colorSpaceConversion: 'none'` and blended in script, not with the
   canvas's own compositing: see `pixelsOf` and `blendInto`.

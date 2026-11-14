@@ -66,18 +66,17 @@ import {
 import {
   CHANGES,
   QUICK,
-  REFERENCE_WORDS,
-  REMOVE_WORDS,
   SHAPES,
   SIZES,
   VARY,
+  areaPrompt,
   dimensions,
   withStyle,
   type ChangeId,
   type ShapeId,
   type SizeId,
 } from './recipes';
-import { AREA_REFERENCES, Marks, blendInto, blendOf, markerName, maskOf, maskPng } from './marks';
+import { AREA_REFERENCES, Marks, blendInto, blendOf, markerName, maskOf, maskPng, paintedWith } from './marks';
 import { LONGEST, shortName, stamp } from './names';
 import { cancelRun, newId, onEnded, recoverRuns, runSteps, startRun, useLive } from './runs';
 import { Library, type LibraryActions } from './Library';
@@ -890,14 +889,20 @@ export function Studio() {
         await steps.hold(mask);
         const extra = area.references.length ? await hold(area.references.map((p) => p.path)) : [];
         await steps.hold(...extra);
-        const prompt = area.words || (area.references.length ? REFERENCE_WORDS : REMOVE_WORDS);
+        const removing = !area.words && area.references.length === 0;
+        const prompt = areaPrompt(area.words, area.references.length, able.edit, markerName(area.swatch).toLowerCase());
+        let reference = current;
+        if (able.edit && !removing) {
+          reference = await upload('marked.png', await pngOf(paintedWith(pixels, area.mask, area.swatch)));
+          await steps.hold(reference);
+        }
         const input = withLoras(
           {
             prompt,
             image: current,
             mask,
             strength: 1,
-            ...(able.edit ? { references: [current, ...extra] } : {}),
+            ...(able.edit ? { references: [reference, ...extra] } : {}),
             ...sized(able, width, height),
             ...settings.input,
           },
@@ -1174,7 +1179,9 @@ export function Studio() {
     const run = await getRun(id);
     if (!run) return;
     try {
-      const title = (await titleOf(run)) || (run.action === 'enlarge' ? 'Enlarged picture' : 'Picture');
+      const title =
+        (await titleOf(run)) ||
+        (run.action === 'enlarge' ? 'Enlarged picture' : run.source ? 'Changed picture' : 'Picture');
       await tool('name', { run: id, base: `${stamp(run.made)} ${title}` });
     } catch (error) {
       failed('The picture was not named.', null)(error);

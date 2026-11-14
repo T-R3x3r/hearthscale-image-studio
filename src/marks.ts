@@ -2,12 +2,14 @@ import type { Swatch } from '@hearthscale/app-ui';
 import type { Picture } from './records';
 
 /** The marker colours in the order the person meets them. One colour marks
- *  one area of the picture. */
-export const MARKERS: readonly { swatch: Swatch; name: string }[] = [
-  { swatch: 'rose', name: 'Red' },
-  { swatch: 'ocean', name: 'Blue' },
-  { swatch: 'moss', name: 'Green' },
-  { swatch: 'amber', name: 'Orange' },
+ *  one area of the picture. `paint` is the colour an edit model sees the
+ *  area filled with, in its reference picture: a plain, saturated colour
+ *  of the same name, whatever the theme draws the marks in. */
+export const MARKERS: readonly { swatch: Swatch; name: string; paint: [number, number, number] }[] = [
+  { swatch: 'rose', name: 'Red', paint: [230, 30, 30] },
+  { swatch: 'ocean', name: 'Blue', paint: [30, 80, 230] },
+  { swatch: 'moss', name: 'Green', paint: [30, 170, 50] },
+  { swatch: 'amber', name: 'Orange', paint: [245, 140, 20] },
 ];
 
 export const markerName = (swatch: Swatch) => MARKERS.find((marker) => marker.swatch === swatch)!.name;
@@ -311,4 +313,13 @@ export function blendInto(base: ImageData, result: ImageData, blend: Float32Arra
     for (let c = 0; c < 3; c++)
       to[p + c] = share === 1 ? from[p + c] : Math.round(to[p + c] + (from[p + c] - to[p + c]) * share);
   }
+}
+
+/** A copy of the picture with an area filled in its marker's paint, which
+ *  shows an edit model where the area lies. */
+export function paintedWith(base: ImageData, mask: Uint8Array, swatch: Swatch): ImageData {
+  const painted = new ImageData(new Uint8ClampedArray(base.data), base.width, base.height);
+  const [r, g, b] = MARKERS.find((marker) => marker.swatch === swatch)!.paint;
+  for (let i = 0; i < mask.length; i++) if (mask[i]) painted.data.set([r, g, b], i * 4);
+  return painted;
 }

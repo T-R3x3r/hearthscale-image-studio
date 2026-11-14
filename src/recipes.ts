@@ -70,8 +70,18 @@ export const IDEAS = [
 export const REMOVE_WORDS =
   'Remove every object, person, text and interface element in front of the scene, and show the background behind them, seamless, as if nothing had ever been there.';
 
-/** The words of a marked area that holds pictures but no words of its own. */
-export const REFERENCE_WORDS = 'Put the subject of the added picture here, matching the light and the scene.';
+/** The prompt of one marked area's job. An area with no words and no
+ *  pictures is removed. A model that follows reference pictures sees the
+ *  area filled in its colour in picture 1, and the area's pictures after
+ *  it, so it is told to replace the area of that colour; any other model
+ *  reads the words as what the area shows. */
+export function areaPrompt(words: string, pictures: number, edit: boolean, colour: string): string {
+  if (!words && pictures === 0) return REMOVE_WORDS;
+  if (!edit) return words;
+  const what = words || 'the subject of the added picture';
+  const from = pictures === 0 ? '' : pictures === 1 ? ' from picture 2' : ` from pictures 2 to ${pictures + 1}`;
+  return `Replace the ${colour} area with ${what}${from}, matching the light and the scene around it.`;
+}
 
 /** Changes of the whole picture that take one press, for a model that
  *  follows reference pictures. */
