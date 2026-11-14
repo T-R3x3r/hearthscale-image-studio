@@ -143,24 +143,38 @@ function ModelSlot() {
   return <span ref={place} className="is-model-slot" />;
 }
 
-/** Counts each picker's whole name, so the result holds while names are hidden. */
-function useShortRow(row: RefObject<HTMLDivElement | null>): boolean {
-  const [short, setShort] = useState(false);
+/** How the composer's footer fits: `short` while the pickers' names do not
+ *  fit, so the pickers show their icons alone; `wrap` while even the icons
+ *  do not, so the footer takes a second line. Each picker's whole name is
+ *  counted, so the result holds while names are hidden, and every part is
+ *  counted on one line, each of the end's parts on its own, so it holds
+ *  while the footer wraps. */
+function useShortRow(row: RefObject<HTMLDivElement | null>): { short: boolean; wrap: boolean } {
+  const [fit, setFit] = useState({ short: false, wrap: false });
   const measure = () => {
     const el = row.current!;
     const style = getComputedStyle(el);
     const room = el.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
-    const parts = [...el.children].filter((part) => getComputedStyle(part).display !== 'none');
+    const nameGap = parseFloat(style.getPropertyValue('--gap-inline')) || 0;
+    const parts = [...el.children]
+      .flatMap((part) => (getComputedStyle(part).display === 'contents' ? [...part.children] : [part]))
+      .filter((part) => getComputedStyle(part).display !== 'none');
     let need = parseFloat(style.columnGap) * (parts.length - 1);
+    let names = 0;
     for (const part of parts) {
       const own = getComputedStyle(part);
       need += Number(own.flexGrow) > 0 ? parseFloat(own.minWidth) || 0 : part.getBoundingClientRect().width;
       for (const name of part.querySelectorAll<HTMLElement>('.hs-model-trigger-name')) {
         const shown = name.getBoundingClientRect().width + parseFloat(getComputedStyle(name).marginRight);
         need += name.scrollWidth - shown;
+        names += name.scrollWidth + nameGap;
       }
     }
-    setShort((was) => need > (was ? room - 1 : room));
+    setFit((was) => {
+      const short = need > (was.short ? room - 1 : room);
+      const wrap = need - names > (was.wrap ? room - 1 : room);
+      return short === was.short && wrap === was.wrap ? was : { short, wrap };
+    });
   };
   useLayoutEffect(measure);
   useLayoutEffect(() => {
@@ -168,7 +182,7 @@ function useShortRow(row: RefObject<HTMLDivElement | null>): boolean {
     observer.observe(row.current!);
     return () => observer.disconnect();
   }, []);
-  return short;
+  return fit;
 }
 
 function Loras(props: { adapters: ModelCard[]; on: Lora[]; onChange: (on: Lora[]) => void; short: boolean }) {
@@ -379,7 +393,7 @@ export function PromptBar(props: {
 }) {
   const file = useRef<HTMLInputElement>(null);
   const footer = useRef<HTMLDivElement>(null);
-  const short = useShortRow(footer);
+  const { short, wrap } = useShortRow(footer);
   const [advancedAt, setAdvancedAt] = useState<HTMLElement | null>(null);
   const tips = useFloatingTips('top');
   const { mode } = props;
@@ -467,7 +481,12 @@ export function PromptBar(props: {
             />
           </div>
         )}
-        <div ref={footer} className="hs-composer-footer is-prompt-row" data-short={short ? 'true' : undefined}>
+        <div
+          ref={footer}
+          className="hs-composer-footer is-prompt-row"
+          data-short={short ? 'true' : undefined}
+          data-wrap={wrap ? 'true' : undefined}
+        >
           {(mode === 'make' || (mode === 'change' && props.canAddReference)) && (
             <span {...add.hover} className="is-tipwrap">
               <Tool
@@ -628,7 +647,7 @@ export function PromptBar(props: {
                 {improve.tip}
               </span>
             )}
-            <span {...off.hover} className="is-tipwrap">
+            <span {...off.hover} className="is-tipwrap is-prompt-action">
               <Button variant="primary" size="sm" disabled={!props.ready || props.busy} onClick={props.onSubmit}>
                 {props.action}
               </Button>

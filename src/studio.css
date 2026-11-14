@@ -61,6 +61,27 @@ body {
   margin-right: calc(var(--gap-inline) * -1);
 }
 
+/* A row too narrow even for the pickers' icons takes a second line: the
+   tools of the words stay with the pickers, and the model slot and the main
+   action share the second line. */
+.is-prompt-row[data-wrap='true'] {
+  flex-wrap: wrap;
+  row-gap: var(--space);
+}
+
+.is-prompt-row[data-wrap='true'] .is-prompt-end {
+  display: contents;
+}
+
+.is-prompt-row[data-wrap='true'] .is-model-slot {
+  order: 1;
+}
+
+.is-prompt-row[data-wrap='true'] .is-prompt-action {
+  order: 2;
+  margin-left: auto;
+}
+
 .is-tool:disabled {
   background: none;
   box-shadow: none;
