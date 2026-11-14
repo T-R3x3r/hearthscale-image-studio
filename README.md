@@ -16,8 +16,8 @@ library. Your words and pictures go only to your own Hearthscale Servers.
 - **Mark** parts of the picture with the brush or a box, in up to four
   colours. Say what goes in each colour, or leave it empty to remove what is
   there. One press changes each area in turn, and every pixel outside the
-  marks stays as it was. **Invert** marks everything except what you marked,
-  and **Soft edge** blends each change into the picture.
+  marks stays as it was. **Invert** marks everything that is not marked, and
+  **Soft edge** blends each change into the picture.
 - **Quick changes**, with a model made for editing: **Remove all text**,
   **Remove the interface** of a game or an app, **Make it night** and
   **Remove the background**, each in one press. With such a model, you can
