@@ -1,7 +1,27 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type RefObject } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type RefObject,
+} from 'react';
 import type { ChatMessage, ModelCard } from '@hearthscale/app';
-import { Button, Icon, IconButton, Lightbox, Meter, ShellConfirm, Toast, useFloatingTips } from '@hearthscale/app-ui';
-import { call, dataPath, download, fileUrl, hostContext, on, reason, tool } from './bridge';
+import {
+  Button,
+  Chip,
+  Icon,
+  IconButton,
+  Lightbox,
+  Meter,
+  ShellConfirm,
+  Toast,
+  useFloatingTips,
+  type Swatch,
+} from '@hearthscale/app-ui';
+import { assetUrl, call, dataPath, download, fileUrl, hostContext, on, reason, tool } from './bridge';
 import {
   addRun,
   finishRun,
@@ -27,26 +47,42 @@ import {
   readModels,
   withLoras,
   type Abilities,
+  type Fitted,
   type Lora,
   type Models,
 } from './models';
-import { blobOf, extended, fileName, marginsOf, maskOf, prepared, sizeOf, upload, type Stroke } from './pictures';
 import {
-  dimensions,
-  ERASE_WORDS,
-  PLAIN_BACKGROUND_WORDS,
+  blobOf,
+  extended,
+  fileName,
+  marginsOf,
+  pixelsOf,
+  pngOf,
+  prepared,
+  sizeOf,
+  upload,
+  type Margins,
+} from './pictures';
+import {
+  CHANGES,
+  QUICK,
+  REFERENCE_WORDS,
+  REMOVE_WORDS,
   SHAPES,
   SIZES,
   VARY,
+  dimensions,
   withStyle,
+  type ChangeId,
   type ShapeId,
   type SizeId,
 } from './recipes';
+import { AREA_REFERENCES, Marks, blendInto, blendOf, markerName, maskOf, maskPng } from './marks';
 import { LONGEST, shortName, stamp } from './names';
-import { cancelRun, newId, onEnded, recoverRuns, startRun, useLive } from './runs';
+import { cancelRun, newId, onEnded, recoverRuns, runSteps, startRun, useLive } from './runs';
 import { Library, type LibraryActions } from './Library';
-import { Stage, StageBar, type Mode, type PictureActions, type Sides, type StageProps, type Tool } from './Stage';
-import { PromptBar, type Advanced } from './PromptBar';
+import { Stage, StageBar, type Comparing, type PictureActions, type Sides, type StageProps, type Tool } from './Stage';
+import { PromptBar, type Advanced, type PromptMode } from './PromptBar';
 import { ComparePage, type Column } from './ComparePage';
 import { ProblemNotice, type Problem } from './Problem';
 
@@ -76,16 +112,24 @@ interface Prefs {
   count: number;
   compare: string[];
   loras: Lora[];
+  change: ChangeId;
 }
 
-const PREFS: Prefs = { shape: 'square', size: 'medium', style: null, count: 1, compare: [], loras: [] };
+const PREFS: Prefs = {
+  shape: 'square',
+  size: 'medium',
+  style: null,
+  count: 1,
+  compare: [],
+  loras: [],
+  change: 'medium',
+};
 
 const LABELS: Record<Action | 'compare', string> = {
   make: 'Make',
   change: 'Change',
   edit: 'Change',
-  fill: 'Fill',
-  erase: 'Erase',
+  mark: 'Change',
   extend: 'Extend',
   enlarge: 'Enlarge',
   open: 'Open',
@@ -97,22 +141,18 @@ const UNDONE: Record<Action | 'compare', string> = {
   make: 'The picture was not made.',
   change: 'The picture was not changed.',
   edit: 'The picture was not changed.',
-  fill: 'The picture was not changed.',
-  erase: 'The picture was not changed.',
-  extend: 'The picture was not changed.',
+  mark: 'The picture was not changed.',
+  extend: 'The picture was not extended.',
   enlarge: 'The picture was not enlarged.',
   open: 'The picture did not open.',
   compare: 'The comparison did not start.',
 };
 
-/** What the prompt holds for each action, as an example of real words. */
-const EXAMPLES: Record<Exclude<Action, 'enlarge' | 'open'> | 'compare', string> = {
+/** What the prompt holds in each mode, as an example of real words. */
+const EXAMPLES: Record<Exclude<PromptMode, 'areas'>, string> = {
   make: 'A red fox in a snowy forest at dawn',
   compare: 'A red fox in a snowy forest at dawn',
   change: 'Make it winter, with snow on the roofs',
-  edit: 'Make it winter, with snow on the roofs',
-  fill: 'A wooden bench',
-  erase: 'A wooden bench',
   extend: 'More of the beach and the sky',
 };
 
@@ -122,6 +162,9 @@ const NAME =
   "You name a picture's file. Answer with a name of two to five words that says what the picture shows, taken from the prompt it was made with. Answer with the name alone, with no quotes and no full stop.";
 const DESCRIBE =
   'Describe this picture as one prompt for an image model: the subject, the setting, the light and the look. Answer with the prompt alone, in at most 60 words, with no quotes.';
+
+/** The most pictures the prompt adds to the picture it changes. */
+const PROMPT_REFERENCES = 9;
 
 function newRun(fields: Partial<Run> & Pick<Run, 'kind' | 'action' | 'model' | 'label'>): Run {
   return {
@@ -181,6 +224,10 @@ function sized(abilities: Abilities, width: number, height: number) {
   return abilities.size ? { width, height } : {};
 }
 
+/** The LoRAs a run used, as its record keeps them. */
+const lorasOf = (used: Fitted[]) =>
+  used.map(({ adapter, weight }) => ({ id: adapter.id, label: adapter.label, weight }));
+
 /** Collects a streamed completion of the app's chat model. */
 async function complete(content: ChatMessage['content'], system: string | null): Promise<string> {
   const stream = newId();
@@ -217,9 +264,9 @@ async function complete(content: ChatMessage['content'], system: string | null):
 /** The widths below which the library lies over the stage, and the bars keep only their main actions. */
 const CRAMPED = '(width < 900px)';
 const NARROW = '(width < 640px)';
-/** The main area's width, in CSS pixels, under which the tools' bars put
- *  their sides and sliders behind presses: the widest bar, Brush with
- *  Amount, then still leaves the picture's name room. */
+/** The main area's width, in CSS pixels, under which the tool row puts its
+ *  colours, sides and sliders behind presses: the widest row, the brush
+ *  with both sliders, then still fits beside the stage's inset. */
 const ROOMY = 1040;
 
 /** An element's width in CSS pixels, read again whenever it resizes. */
@@ -250,6 +297,26 @@ function useWidthBelow(query: string) {
   return useSyncExternalStore(subscribe, () => matchMedia(query).matches);
 }
 
+/** One area of a run of marked areas, as the run took it. */
+interface Planned {
+  swatch: Swatch;
+  words: string;
+  references: Picture[];
+  mask: Uint8Array;
+}
+
+/** What a change of the whole picture asks for. */
+interface Change {
+  kind: 'edit' | 'change';
+  from: Picture;
+  prompt: string;
+  strength: number;
+  style: string | null;
+  loras: Lora[];
+  extra: Picture[];
+  count: number;
+}
+
 export function Studio() {
   const [models, setModels] = useState<Models | null>(null);
   const [prefs, setPrefsState] = useState<Prefs>(PREFS);
@@ -265,23 +332,19 @@ export function Studio() {
   const [shown, setShown] = useState<Picture | null>(null);
   const [shownSize, setShownSize] = useState<{ width: number; height: number } | null>(null);
   const [shownFrom, setShownFrom] = useState<Picture | null>(null);
-  const [comparing, setComparing] = useState<StageProps['comparing']>(null);
+  const [comparing, setComparing] = useState<Comparing | null>(null);
   const [selected, setSelected] = useState<string[]>([]);
   const [pair, setPair] = useState<[Picture, Picture] | null>(null);
   const [stripRun, setStripRun] = useState<Run | null>(null);
   const [strip, setStrip] = useState<Picture[]>([]);
-  const [source, setSource] = useState<Picture | null>(null);
-  const [sourceSize, setSourceSize] = useState<{ width: number; height: number } | null>(null);
   const [references, setReferences] = useState<Picture[]>([]);
-  const [words, setWords] = useState('');
+  const [makeWords, setMakeWords] = useState('');
+  const [changeWords, setChangeWords] = useState('');
   const [advanced, setAdvanced] = useState<Advanced>({ negative: '', steps: '', guidance: '', seed: '' });
-  const [mode, setMode] = useState<Mode>('edit');
-  const [amount, setAmount] = useState(0.75);
-  const [currentTool, setTool] = useState<Tool>('none');
-  const [strokes, setStrokes] = useState<Stroke[]>([]);
-  const painted = strokes.some((stroke) => !stroke.erase);
+  const [currentTool, setTool] = useState<Tool>('brush');
+  const [swatch, setSwatch] = useState<Swatch>('rose');
   const [brushSize, setBrushSize] = useState(48);
-  const [erasing, setErasing] = useState(false);
+  const [softEdge, setSoftEdge] = useState(12);
   const [sides, setSides] = useState<Sides>({ left: false, right: true, top: false, bottom: false, share: 0.25 });
   const [compareSet, setCompareSet] = useState<string | null>(null);
   const [compareRuns, setCompareRuns] = useState<{ run: Run; picture: Picture | null }[]>([]);
@@ -292,12 +355,16 @@ export function Studio() {
   const [helping, setHelping] = useState(false);
   const [starting, setStarting] = useState(false);
   const [opened, setOpened] = useState(false);
+  const marks = useMemo(() => new Marks(), []);
+  useSyncExternalStore(marks.subscribe, () => marks.version);
   const composer = useRef<HTMLDivElement>(null);
   const shownBlob = useRef<{ path: string; blob: Blob } | null>(null);
   const shownBefore = useRef<Picture | null>(null);
   const stripRunRef = useRef<Run | null>(null);
   /** What starts each run again, by the run's id. */
   const agains = useRef(new Map<string, () => Promise<unknown>>());
+  /** The areas of each run of marked areas, by the run's id. */
+  const plans = useRef(new Map<string, { swatch: Swatch; removing: boolean }[]>());
   const compareSetRef = useRef<string | null>(null);
   const places = useRef<{ back: Place[]; forward: Place[] }>({ back: [], forward: [] });
   const here = useRef<Place>({ section: 'all', picture: null });
@@ -306,6 +373,7 @@ export function Studio() {
   const live = useLive();
   const locale = hostContext().locale ?? navigator.language;
   const tips = useFloatingTips('right');
+  const barTips = useFloatingTips('bottom');
 
   stripRunRef.current = stripRun;
   compareSetRef.current = compareSet;
@@ -375,8 +443,8 @@ export function Studio() {
 
   useEffect(() => setFolded(cramped), [cramped]);
 
-  // A problem belongs to what failed; another page or another picture to edit leaves it behind.
-  useEffect(() => setProblem(null), [page, source?.id]);
+  // A problem belongs to what failed; another page leaves it behind.
+  useEffect(() => setProblem(null), [page]);
 
   useEffect(() => on('hearthscale/models/chosen', () => void refreshModels()), [refreshModels]);
 
@@ -390,7 +458,7 @@ export function Studio() {
           setStripRun(await getRun(id));
           setStrip(made);
           if (outcome === 'done' && made[0]) await show(made[0]);
-          if (outcome !== 'done' && shownBefore.current) await show(shownBefore.current);
+          if (outcome !== 'done' && !run.source && shownBefore.current) await show(shownBefore.current);
           if (outcome === 'failed' && error) {
             failed(UNDONE[run.action], agains.current.get(id) ?? null)(error);
           }
@@ -418,13 +486,31 @@ export function Studio() {
     [refreshModels, models],
   );
 
+  // Another picture starts with no marks and no added pictures, at the brush;
+  // the same picture under a new path, or made a favourite, keeps them.
   useEffect(() => {
     setShownSize(null);
+    setReferences([]);
+    setTool('brush');
+    setSwatch('rose');
+    marks.reset(0, 0);
+    if (!shown) return;
+    let current = true;
+    void sizeOf(shown.path).then((size) => {
+      if (!current) return;
+      setShownSize(size);
+      marks.reset(size.width, size.height);
+    });
+    return () => {
+      current = false;
+    };
+  }, [shown?.id, marks]);
+
+  useEffect(() => {
     setShownFrom(null);
     shownBlob.current = null;
     if (!shown) return;
     let current = true;
-    void sizeOf(shown.path).then((size) => current && setShownSize(size));
     void blobOf(shown.path).then((blob) => {
       if (current) shownBlob.current = { path: shown.path, blob };
     });
@@ -438,7 +524,7 @@ export function Studio() {
     return () => {
       current = false;
     };
-  }, [shown]);
+  }, [shown?.path, shown?.run]);
 
   useEffect(() => {
     const id = shown?.id;
@@ -468,14 +554,6 @@ export function Studio() {
   }, [selected, pictures]);
 
   useEffect(() => {
-    setSourceSize(null);
-    setTool('none');
-    setStrokes([]);
-    if (!source) return;
-    void sizeOf(source.path).then(setSourceSize);
-  }, [source]);
-
-  useEffect(() => {
     const paste = (event: ClipboardEvent) => {
       const file = [...(event.clipboardData?.files ?? [])].find((f) => f.type.startsWith('image/'));
       if (file) {
@@ -492,35 +570,72 @@ export function Studio() {
   const abilities = abilitiesOf(model ?? undefined);
   const upscaler = models?.upscale.find((card) => card.id === models.upscaleChosen) ?? models?.upscale[0] ?? null;
   const chat = models?.chat ?? null;
-  const editing = !!source && page === 'studio';
-  const extending = editing && currentTool === 'extend' && (sides.left || sides.right || sides.top || sides.bottom);
 
-  let action: keyof typeof EXAMPLES;
-  if (page === 'compare') action = 'compare';
-  else if (!editing) action = 'make';
-  else if (extending) action = 'extend';
-  else if (painted) action = words.trim() ? 'fill' : 'erase';
-  else action = abilities.edit && (mode === 'edit' || !abilities.change) ? 'edit' : 'change';
+  const stripLive = stripRun ? (live.get(stripRun.id) ?? null) : null;
+  /** The run the stage shows in place of its picture: a new picture, or a
+   *  change of the picture shown. */
+  const stageLive =
+    stripRun && stripLive && stripRun.action !== 'enlarge' && (stripRun.source ? stripRun.source === shown?.id : !shown)
+      ? stripLive
+      : null;
+  const target = page === 'studio' ? shown : null;
+  const changing = !!target && !!stageLive;
+  const markable = !!target && abilities.fill && !!shownSize && marks.width === shownSize.width;
+  const areas = markable ? marks.areas : [];
+  const canChange = abilities.edit || abilities.change;
+
+  let mode: PromptMode;
+  if (page === 'compare') mode = 'compare';
+  else if (!target || !canChange) mode = 'make';
+  else if (markable && currentTool === 'extend') mode = 'extend';
+  else if (areas.length > 0) mode = 'areas';
+  else mode = 'change';
+
+  const words = mode === 'make' || mode === 'compare' ? makeWords : changeWords;
+  const setWords = mode === 'make' || mode === 'compare' ? setMakeWords : setChangeWords;
+  const removing = areas.every((area) => !area.words.trim() && area.references.length === 0);
+  const anySide = sides.left || sides.right || sides.top || sides.bottom;
+  const comparable = prefs.compare.filter((id) => imageCards.some((c) => c.id === id)).length >= 2;
+
+  const actionLabel = {
+    make: 'Make',
+    compare: 'Compare',
+    change: 'Change the picture',
+    extend: 'Extend the picture',
+    areas: `${removing ? 'Remove' : 'Change'} ${areas.length} ${areas.length === 1 ? 'area' : 'areas'}`,
+  }[mode];
 
   const ready = (() => {
     if (!model) return false;
-    const hasWords = !!words.trim();
-    switch (action) {
+    switch (mode) {
       case 'compare':
-        return hasWords && prefs.compare.filter((id) => imageCards.some((c) => c.id === id)).length >= 2;
+        return !!makeWords.trim() && comparable;
       case 'make':
-        return hasWords;
+        return !!makeWords.trim();
       case 'change':
-        return hasWords && abilities.change && !!sourceSize;
-      case 'edit':
-        return hasWords && abilities.edit && !!sourceSize;
-      case 'fill':
-        return hasWords && abilities.fill && !!sourceSize;
-      case 'erase':
+        return !changing && !!changeWords.trim() && !!shownSize;
+      case 'areas':
+        return !changing;
       case 'extend':
-        return abilities.fill && !!sourceSize;
+        return !changing && anySide;
+    }
+  })();
+
+  /** Why the action is off, where the person can change that. */
+  const why = (() => {
+    if (!model || ready) return null;
+    if (changing) return 'Wait until this change is done';
+    switch (mode) {
+      case 'compare':
+        return comparable ? 'Write what you want to see' : 'Choose two or more models';
+      case 'make':
+        return 'Write what you want to see';
+      case 'change':
+        return 'Write what to change';
+      case 'extend':
+        return 'Choose a side to extend';
       default:
-        return false;
+        return null;
     }
   })();
 
@@ -535,31 +650,39 @@ export function Studio() {
       });
   }
 
-  /** Why the action is off, where the person can change that. */
-  const why = (() => {
-    if (!model || ready) return null;
-    if (action === 'compare' && prefs.compare.filter((id) => imageCards.some((c) => c.id === id)).length < 2) {
-      return 'Choose two or more models';
+  /** Shows a run as it starts: a change on the picture it changes, a new
+   *  picture on an empty stage. */
+  function showRun(run: Run, again: () => Promise<unknown>, from: Picture | null) {
+    setProblem(null);
+    agains.current.set(run.id, again);
+    setStripRun(run);
+    setStrip([]);
+    setComparing(null);
+    if (from) {
+      if (shown?.id !== from.id) setShown(from);
+    } else {
+      shownBefore.current = shown;
+      setShown(null);
     }
-    if (words.trim() || action === 'erase' || action === 'extend') return null;
-    return action === 'fill' ? 'Write what to put there' : 'Write what you want to see';
-  })();
+  }
 
   /** `again` restarts the run if it fails. */
-  async function begin(run: Run, input: Record<string, unknown>, again: () => Promise<unknown>, loras: Lora[]) {
+  async function begin(
+    run: Run,
+    input: Record<string, unknown>,
+    again: () => Promise<unknown>,
+    loras: Lora[],
+    from: Picture | null,
+  ) {
     const card = imageCards.find((c) => c.id === run.model);
     const used = card ? fitting(card, loras, models?.adapters ?? []) : [];
-    const started: Run = {
-      ...run,
-      loras: used.map(({ adapter, weight }) => ({ id: adapter.id, label: adapter.label, weight })),
-    };
-    setProblem(null);
-    agains.current.set(started.id, again);
-    setStripRun(started);
-    setStrip([]);
-    shownBefore.current = shown;
-    if (started.action !== 'enlarge') setShown(null);
-    setComparing(null);
+    const started: Run = { ...run, loras: lorasOf(used) };
+    if (started.action === 'enlarge') {
+      setProblem(null);
+      agains.current.set(started.id, again);
+      setStripRun(started);
+      setStrip([]);
+    } else showRun(started, again, from);
     await startRun(started, withLoras(input, used), LABELS[started.action]);
   }
 
@@ -570,19 +693,53 @@ export function Studio() {
   async function submit() {
     if (!model || !ready || starting) return;
     setStarting(true);
+    const undone = mode === 'make' || mode === 'compare' ? UNDONE[mode] : UNDONE.change;
     try {
-      if (action === 'compare') return await compare();
-      if (action === 'make') return await make();
-      await change(action);
+      if (mode === 'compare') await compare();
+      else if (mode === 'make') await make();
+      else if (mode === 'areas') {
+        const from = shown!;
+        const size = shownSize!;
+        const plan: Planned[] = areas.map((area) => ({
+          swatch: area.swatch,
+          words: area.words.trim(),
+          references: area.references,
+          mask: maskOf(area),
+        }));
+        const soft = softEdge;
+        const loras = prefs.loras;
+        marks.reset(size.width, size.height);
+        await changeAreas(from, size, plan, soft, loras);
+      } else if (mode === 'extend') {
+        const from = shown!;
+        const margins = marginsOf(shownSize!, sides, sides.share);
+        const prompt = changeWords.trim();
+        setChangeWords('');
+        setTool('brush');
+        await extend(from, margins, prompt, prefs.loras);
+      } else {
+        const prompt = changeWords.trim();
+        setChangeWords('');
+        await change({
+          kind: abilities.edit ? 'edit' : 'change',
+          from: shown!,
+          prompt,
+          strength: CHANGES.find((c) => c.id === prefs.change)!.strength,
+          style: prefs.style,
+          loras: prefs.loras,
+          extra: abilities.edit ? references : [],
+          count: prefs.count,
+        });
+      }
     } catch (error) {
-      failed(UNDONE[action], submit)(error);
+      failed(undone, submit)(error);
     } finally {
       setStarting(false);
     }
   }
 
   async function make() {
-    const { prompt, avoid } = withStyle(words.trim(), prefs.style);
+    const { prompt, avoid } = withStyle(makeWords.trim(), prefs.style);
     const { width, height } = dimensions(prefs.shape, prefs.size, abilities.side);
     const settings = shared(abilities, advanced, avoid, prefs.count);
     const run = newRun({
@@ -590,7 +747,7 @@ export function Studio() {
       action: 'make',
       model: model!.id,
       label: model!.label,
-      prompt: words.trim(),
+      prompt: makeWords.trim(),
       style: prefs.style,
       width,
       height,
@@ -600,91 +757,173 @@ export function Studio() {
       seed: settings.seed,
       count: settings.count,
     });
-    await begin(run, { prompt, ...sized(abilities, width, height), ...settings.input }, make, prefs.loras);
+    await begin(run, { prompt, ...sized(abilities, width, height), ...settings.input }, make, prefs.loras, null);
   }
 
-  async function change(
-    kind: Action,
-    from: Picture = source!,
-    strength = amount,
-    prompt = words.trim(),
-    loras: Lora[] = prefs.loras,
-  ) {
-    const size = from.id === source?.id && sourceSize ? sourceSize : await sizeOf(from.path);
-    const styled = withStyle(prompt || from.prompt, kind === 'erase' || kind === 'extend' ? null : prefs.style);
-    const settings = shared(abilities, advanced, styled.avoid, kind === 'extend' || kind === 'erase' ? 1 : prefs.count);
-    let input: Record<string, unknown>;
-    const inputs: string[] = [];
-    let width = size.width;
-    let height = size.height;
-    try {
-      if (kind === 'edit') {
-        const extra = from.id === source?.id ? references : [];
-        inputs.push(...(await hold([from.path, ...extra.map((r) => r.path)])));
-        input = { prompt: styled.prompt, references: [...inputs] };
-      } else if (kind === 'change') {
-        inputs.push(...(await hold([from.path])));
-        input = { prompt: styled.prompt, image: inputs[0], strength };
-      } else if (kind === 'fill' || kind === 'erase') {
-        inputs.push(...(await hold([from.path])));
-        inputs.push(await upload('mask.png', await maskOf(strokes, sourceSize!.width, sourceSize!.height)));
-        input = {
-          prompt: kind === 'erase' ? ERASE_WORDS : styled.prompt,
-          image: inputs[0],
-          mask: inputs[1],
-          strength: kind === 'erase' ? 1 : strength,
-        };
-      } else {
-        const grown = await extended(from.path, marginsOf(size, sides, sides.share));
-        inputs.push(await upload('extended.png', grown.image));
-        inputs.push(await upload('mask.png', grown.mask));
-        width = grown.width;
-        height = grown.height;
-        input = {
-          prompt: styled.prompt || 'the rest of the scene',
-          image: inputs[0],
-          mask: inputs[1],
-          strength: 1,
-        };
-      }
-    } catch (error) {
-      if (inputs.length) await tool('release', { assets: inputs });
-      throw error;
-    }
+  /** Changes the whole picture: by the words of an edit model that reads
+   *  the picture and the prompt's pictures, or drawn again from it. */
+  async function change(asked: Change) {
+    const { kind, from } = asked;
+    const size = from.id === shown?.id && shownSize ? shownSize : await sizeOf(from.path);
+    const styled = withStyle(asked.prompt || from.prompt, asked.style);
+    const settings = shared(abilities, advanced, styled.avoid, asked.count);
+    const inputs = await hold([from.path, ...(kind === 'edit' ? asked.extra.map((p) => p.path) : [])]);
+    const input =
+      kind === 'edit'
+        ? { prompt: styled.prompt, references: [...inputs] }
+        : { prompt: styled.prompt, image: inputs[0], strength: asked.strength };
     const run = newRun({
       kind: 'image',
       action: kind,
       model: model!.id,
       label: model!.label,
-      prompt: kind === 'fill' || kind === 'erase' || kind === 'extend' ? from.prompt : prompt || from.prompt,
-      style: kind === 'erase' || kind === 'extend' ? null : prefs.style,
-      width,
-      height,
+      prompt: asked.prompt || from.prompt,
+      style: asked.style,
+      width: size.width,
+      height: size.height,
       negative: settings.negative,
       steps: settings.steps,
       guidance: settings.guidance,
       seed: settings.seed,
-      strength: 'strength' in input ? (input.strength as number) : null,
+      strength: kind === 'change' ? asked.strength : null,
       count: settings.count,
       source: from.id,
       inputs,
     });
     await begin(
       run,
-      { ...input, ...sized(abilities, width, height), ...settings.input },
-      () => change(kind, from, strength, prompt, loras),
-      loras,
+      { ...input, ...sized(abilities, size.width, size.height), ...settings.input },
+      () => change(asked),
+      asked.loras,
+      from,
     );
-    if (kind === 'fill' || kind === 'erase' || kind === 'extend') {
-      setTool('none');
-      setStrokes([]);
+  }
+
+  /** Grows the picture past its edges: the model draws the new border. */
+  async function extend(from: Picture, margins: Margins, prompt: string, loras: Lora[]) {
+    const settings = shared(abilities, advanced, '', 1);
+    const grown = await extended(from.path, margins);
+    const inputs: string[] = [];
+    try {
+      inputs.push(await upload('extended.png', grown.image));
+      inputs.push(await upload('mask.png', grown.mask));
+    } catch (error) {
+      if (inputs.length) await tool('release', { assets: inputs });
+      throw error;
     }
+    const run = newRun({
+      kind: 'image',
+      action: 'extend',
+      model: model!.id,
+      label: model!.label,
+      prompt: from.prompt,
+      width: grown.width,
+      height: grown.height,
+      negative: settings.negative,
+      steps: settings.steps,
+      guidance: settings.guidance,
+      seed: settings.seed,
+      strength: 1,
+      source: from.id,
+      inputs,
+    });
+    await begin(
+      run,
+      {
+        prompt: prompt || 'the rest of the scene',
+        image: inputs[0],
+        mask: inputs[1],
+        strength: 1,
+        ...sized(abilities, grown.width, grown.height),
+        ...settings.input,
+      },
+      () => extend(from, margins, prompt, loras),
+      loras,
+      from,
+    );
+  }
+
+  /** Changes each marked area in turn, each on the picture the one before
+   *  left: the model draws the area's mask anew from its words, or takes
+   *  away what is there where it has none, and only the pixels of the area
+   *  take the new picture, blended over `soft` pixels at its edge. */
+  async function changeAreas(
+    from: Picture,
+    size: { width: number; height: number },
+    plan: Planned[],
+    soft: number,
+    loras: Lora[],
+  ) {
+    const card = model!;
+    const able = abilities;
+    const { width, height } = size;
+    const settings = shared(able, advanced, '', 1);
+    const used = fitting(card, loras, models?.adapters ?? []);
+    const run = newRun({
+      kind: 'image',
+      action: 'mark',
+      model: card.id,
+      label: card.label,
+      prompt: from.prompt,
+      width,
+      height,
+      negative: settings.negative,
+      steps: settings.steps,
+      guidance: settings.guidance,
+      seed: settings.seed,
+      strength: 1,
+      source: from.id,
+      loras: lorasOf(used),
+    });
+    plans.current.set(
+      run.id,
+      plan.map((area) => ({ swatch: area.swatch, removing: !area.words && area.references.length === 0 })),
+    );
+    showRun(run, () => changeAreas(from, size, plan, soft, loras), from);
+    await runSteps(run, plan.length, async (steps) => {
+      const [first] = await hold([from.path]);
+      await steps.hold(first);
+      let current = first;
+      const pixels = await pixelsOf(await blobOf(from.path), width, height);
+      for (const [index, area] of plan.entries()) {
+        const mask = await upload('mask.png', await maskPng(area.mask, width, height));
+        await steps.hold(mask);
+        const extra = area.references.length ? await hold(area.references.map((p) => p.path)) : [];
+        await steps.hold(...extra);
+        const prompt = area.words || (area.references.length ? REFERENCE_WORDS : REMOVE_WORDS);
+        const input = withLoras(
+          {
+            prompt,
+            image: current,
+            mask,
+            strength: 1,
+            ...(able.edit ? { references: [current, ...extra] } : {}),
+            ...sized(able, width, height),
+            ...settings.input,
+          },
+          used,
+        );
+        const job = await steps.job(index, card.id, input);
+        const outputs = (job.outputs ?? []).flatMap((output) => (output.asset ? [output.asset] : []));
+        await steps.hold(...outputs);
+        if (!outputs[0]) throw new Error('The model gave back no picture.');
+        const answer = await fetch(assetUrl(outputs[0]));
+        if (!answer.ok) throw new Error(await answer.text());
+        const result = await pixelsOf(await answer.blob(), width, height);
+        blendInto(pixels, result, blendOf(area.mask, width, height, soft));
+        current = await upload('picture.png', await pngOf(pixels));
+        await steps.hold(current);
+        steps.preview(current);
+      }
+      await steps.handOver(current);
+      return (await tool<{ path: string }>('keep', { asset: current, run: run.id }, 'Change')).path;
+    });
   }
 
   async function compare() {
     const set = newId();
     const seed = Math.floor(Math.random() * 2 ** 31);
-    const { prompt, avoid } = withStyle(words.trim(), prefs.style);
+    const { prompt, avoid } = withStyle(makeWords.trim(), prefs.style);
     setProblem(null);
     setCompareSet(set);
     for (const card of imageCards.filter((c) => prefs.compare.includes(c.id))) {
@@ -695,7 +934,7 @@ export function Studio() {
         action: 'make',
         model: card.id,
         label: card.label,
-        prompt: words.trim(),
+        prompt: makeWords.trim(),
         style: prefs.style,
         width,
         height,
@@ -741,7 +980,13 @@ export function Studio() {
       compare: null,
     });
     const sizes = run.width && run.height ? sized(abilitiesOf(card), run.width, run.height) : {};
-    await begin(next, { prompt: styled.prompt, ...sizes, ...settings.input }, () => more(run), run.loras);
+    await begin(
+      next,
+      { prompt: styled.prompt, ...sizes, ...settings.input },
+      () => more(run),
+      run.loras.map(({ id, weight }) => ({ id, weight })),
+      null,
+    );
   }
 
   /** Starts the Server's download of a model the app needs, with Hearthscale's install card. */
@@ -762,10 +1007,12 @@ export function Studio() {
       source: picture.id,
       inputs,
     });
-    await begin(run, { image: inputs[0] }, () => enlarge(picture), []);
+    await begin(run, { image: inputs[0] }, () => enlarge(picture), [], picture);
   }
 
-  async function openFile(file: Blob) {
+  /** Keeps a file the person opened in the library: as the picture to work
+   *  on, as a picture of the prompt, or as a picture of one marked area. */
+  async function openFile(file: Blob, into: 'stage' | 'prompt' | Swatch = 'stage') {
     setProblem(null);
     try {
       const asset = await upload('picture.png', await prepared(file));
@@ -777,25 +1024,25 @@ export function Studio() {
       await tool('name', { run: run.id, base: `${stamp(run.made)} ${title || 'Opened picture'}` });
       const picture = (await picturesOfRun(run.id))[0];
       await refreshLibrary();
-      if (source && abilities.edit) setReferences((before) => [...before, picture].slice(0, 9));
-      else {
-        setSource(picture);
-        setReferences([]);
-      }
-      await show(picture);
+      if (into === 'prompt') setReferences((before) => [...before, picture].slice(0, PROMPT_REFERENCES));
+      else if (into === 'stage') {
+        setPage('studio');
+        await show(picture);
+      } else marks.addReference(into, picture);
     } catch (error) {
-      failed(UNDONE.open, () => openFile(file))(error);
+      failed(UNDONE.open, () => openFile(file, into))(error);
     }
   }
 
   async function improve() {
     setHelping(true);
     const before = words;
+    const put = setWords;
     try {
-      const better = await complete(words.trim(), IMPROVE);
+      const better = await complete(before.trim(), IMPROVE);
       if (better) {
-        setWords(better);
-        setToast({ text: 'Words improved', undo: () => setWords(before) });
+        put(better);
+        setToast({ text: 'Words improved', undo: () => put(before) });
       }
     } catch (error) {
       failed('Your words were not improved.', improve)(error);
@@ -816,7 +1063,10 @@ export function Studio() {
         ],
         null,
       );
-      if (text) setWords(text);
+      if (text) {
+        setMakeWords(text);
+        newPicture();
+      }
     } catch (error) {
       failed('The picture was not described.', () => describe(picture))(error);
     } finally {
@@ -828,10 +1078,8 @@ export function Studio() {
   async function useSettings(picture: Picture) {
     const run = await getRun(picture.run);
     if (!run) return;
-    setSource(null);
-    setReferences([]);
-    setPage('studio');
-    setWords(run.prompt);
+    newPicture();
+    setMakeWords(run.prompt);
     setAdvanced({
       negative: run.negative,
       steps: run.steps ? String(run.steps) : '',
@@ -888,8 +1136,8 @@ export function Studio() {
    *  the next one, and every other place that holds one drops it. */
   async function dropped(ids: Set<string>) {
     const kept = (p: Picture) => !ids.has(p.id);
-    if (source && ids.has(source.id)) setSource(null);
     setReferences((before) => before.filter(kept));
+    marks.forget(ids);
     setStrip((before) => before.filter(kept));
     setSelected((before) => before.filter((id) => !ids.has(id)));
     setLarge((before) => {
@@ -937,9 +1185,9 @@ export function Studio() {
     setShown((before) => before && swap(before));
     setShownFrom((before) => before && swap(before));
     setComparing((before) => before && { ...before, before: swap(before.before) });
-    setSource((before) => before && swap(before));
     setStrip((before) => before.map(swap));
     setReferences((before) => before.map(swap));
+    marks.renew(swap);
     setLarge((before) => before && { ...before, items: before.items.map(swap) });
     await refreshLibrary();
     if (compareSetRef.current) await loadCompare(compareSetRef.current);
@@ -978,24 +1226,41 @@ export function Studio() {
     await refreshLibrary();
   }
 
+  /** Adds a picture of the library to the prompt: to the area of the
+   *  colour in use while there are marks, else beside the picture shown. */
+  function addingOf(picture: Picture): PictureActions['addToPrompt'] {
+    if (!target || !abilities.edit || picture.id === target.id || mode === 'extend') return undefined;
+    if (mode === 'areas') {
+      const area = marks.find(swatch);
+      if (!area || area.references.length >= AREA_REFERENCES || area.references.some((r) => r.id === picture.id)) {
+        return undefined;
+      }
+      return {
+        label: `Add to the ${markerName(swatch).toLowerCase()} area`,
+        add: () => marks.addReference(swatch, picture),
+      };
+    }
+    if (references.length >= PROMPT_REFERENCES || references.some((r) => r.id === picture.id)) return undefined;
+    return { label: 'Add to the prompt', add: () => setReferences((before) => [...before, picture]) };
+  }
+
   const actionsFor = (picture: Picture): PictureActions => ({
-    edit:
-      abilities.change || abilities.edit
-        ? () => (setPage('studio'), setSource(picture), setReferences([]), setWords(''))
-        : undefined,
-    addToPrompt:
-      source &&
-      abilities.edit &&
-      source.id !== picture.id &&
-      !references.some((r) => r.id === picture.id) &&
-      references.length < 9
-        ? () => setReferences((before) => [...before, picture])
-        : undefined,
+    addToPrompt: addingOf(picture),
     vary: abilities.change
       ? (how) => {
           const again = async () => {
             const run = await getRun(picture.run);
-            if (run) await change('change', picture, VARY[how], picture.prompt, run.loras);
+            if (run)
+              await change({
+                kind: 'change',
+                from: picture,
+                prompt: picture.prompt,
+                strength: VARY[how],
+                style: prefs.style,
+                loras: run.loras.map(({ id, weight }) => ({ id, weight })),
+                extra: [],
+                count: prefs.count,
+              });
           };
           void again().catch(failed(UNDONE.change, again));
         }
@@ -1017,15 +1282,9 @@ export function Studio() {
             void again().catch(failed(UNDONE.enlarge, again));
           }
         : undefined,
-    plainBackground: abilities.edit
-      ? () => {
-          const again = () => change('edit', picture, 1, PLAIN_BACKGROUND_WORDS);
-          void again().catch(failed(UNDONE.edit, again));
-        }
-      : undefined,
-    compareSource:
+    beforeAfter:
       picture.id === shown?.id && shownFrom
-        ? () => setComparing({ before: shownFrom, beforeName: 'Before', afterName: 'After' })
+        ? () => setComparing({ before: shownFrom, beforeName: 'Before', afterName: 'After', label: 'Before and after' })
         : undefined,
     favourite: () => void markFavourite([picture], !picture.favourite),
     save: () => void saveAs(picture),
@@ -1052,6 +1311,7 @@ export function Studio() {
               before,
               beforeName: named ? before.label : 'Earlier',
               afterName: named ? after.label : 'Later',
+              label: 'Compare',
             }),
           );
         }
@@ -1062,37 +1322,54 @@ export function Studio() {
     },
   };
 
-  const actions: PictureActions | null = shown ? actionsFor(shown) : null;
+  /** Runs a change of the whole picture that takes one press. */
+  function quick(words: string) {
+    if (!shown) return;
+    const again = () =>
+      change({
+        kind: 'edit',
+        from: shown,
+        prompt: words,
+        strength: 1,
+        style: null,
+        loras: prefs.loras,
+        extra: [],
+        count: 1,
+      });
+    void again().catch(failed(UNDONE.change, again));
+  }
 
-  const stripLive = stripRun ? (live.get(stripRun.id) ?? null) : null;
-  const margins =
-    editing && currentTool === 'extend' && sourceSize && extending ? marginsOf(sourceSize, sides, sides.share) : null;
-  const stagePicture = editing && (currentTool !== 'none' || painted) ? source : shown;
-  const stageSize = stagePicture && stagePicture.id === source?.id && sourceSize ? sourceSize : shownSize;
+  const actions: PictureActions | null = shown ? actionsFor(shown) : null;
+  const margins = mode === 'extend' && shownSize && anySide ? marginsOf(shownSize, sides, sides.share) : null;
   const columns: Column[] = compareRuns.map(({ run, picture }) => ({ run, picture, live: live.get(run.id) ?? null }));
   const fold = tips('fold', folded ? 'Show the library' : 'Hide the library');
+  const fresh = barTips('new', 'New picture');
   const lightbox = large !== null && large.items.length > 0;
   /** A part the view draws over the prompt's footer, under which the model slot lies. */
   const covering = lightbox || !!deleting || (cramped && !folded);
   const suggestedImage = models?.downloading.find((card) => card.kind === 'image') ?? models?.absentImage[0] ?? null;
-  const liveLabel = stripRun
-    ? `${stripRun.action === 'make' ? 'Making' : stripRun.action === 'enlarge' ? 'Enlarging' : 'Changing'}…`
-    : '';
+  const plan = stripRun ? plans.current.get(stripRun.id) : undefined;
+  const step = stripLive?.step ?? null;
+  const area = plan && step ? plan[step.index] : null;
+  const liveLabel = !stripRun
+    ? ''
+    : area
+      ? `${area.removing ? 'Removing' : 'Changing'} the ${markerName(area.swatch).toLowerCase()} area…`
+      : stripRun.action === 'make'
+        ? 'Making…'
+        : stripRun.action === 'enlarge'
+          ? 'Enlarging…'
+          : stripRun.action === 'extend'
+            ? 'Extending…'
+            : 'Changing…';
   const stageProps: StageProps = {
     narrow,
     compact: mainWidth < ROOMY,
-    mode,
-    onMode: setMode,
-    amount: action === 'change' || action === 'fill' ? amount : null,
-    onAmount: setAmount,
-    showMode:
-      editing && abilities.edit && abilities.change && action !== 'fill' && action !== 'erase' && action !== 'extend',
-    picture: stagePicture,
-    size: stageSize,
-    source,
+    picture: page === 'studio' ? shown : null,
+    size: shownSize,
     comparing,
     onStopCompare: () => setComparing(null),
-    live: stripLive,
+    live: stageLive,
     liveLabel,
     liveModel: stripRun?.label ?? '',
     noModel: !!models && imageCards.length === 0,
@@ -1110,48 +1387,42 @@ export function Studio() {
       const again = () => install(suggestedImage);
       void again().catch(failed('The model did not install.', again));
     },
-    onIdea: setWords,
+    onIdea: setMakeWords,
+    markable: markable && !changing,
     tool: currentTool,
-    onTool: (next) => {
-      setTool(next);
-      if (next !== 'none') setShown(source);
+    onTool: setTool,
+    marks,
+    swatch,
+    onSwatch: (next) => {
+      setSwatch(next);
+      if (currentTool === 'eraser') setTool('brush');
     },
-    strokes,
     brushSize,
     onBrushSize: setBrushSize,
-    erasing,
-    onErasing: setErasing,
-    painted,
-    onStroke: (stroke) => setStrokes((before) => [...before, stroke]),
-    onClearStrokes: () => setStrokes([]),
+    softEdge,
+    onSoftEdge: setSoftEdge,
     sides,
     onSides: setSides,
     margins,
     actions,
-    onStopEditing: () => {
-      setSource(null);
-      setReferences([]);
-    },
   };
   const title =
     page === 'compare'
       ? 'Compare models'
-      : stagePicture
-        ? pictureName(stagePicture)
+      : shown
+        ? pictureName(shown)
         : stripRun && stripLive
           ? nameOf(stripRun.prompt)
           : 'New picture';
   const away = () => {
     if (cramped) setFolded(true);
   };
-  const newPicture = () => {
+  function newPicture() {
     setPage('studio');
-    setSource(null);
-    setReferences([]);
     void show(null);
     setStripRun(null);
     setStrip([]);
-  };
+  }
 
   /** What opens a place, or null where its picture is gone. */
   async function opening(to: Place): Promise<(() => void) | null> {
@@ -1210,6 +1481,8 @@ export function Studio() {
     void call('hearthscale/ui/cover', { covered: covering });
   }, [covering]);
 
+  const quickShown = mode === 'change' && abilities.edit && !changing;
+
   return (
     <div
       className="is-studio"
@@ -1243,7 +1516,6 @@ export function Studio() {
             onOpen={away}
             onNew={() => {
               away();
-              setWords('');
               newPicture();
             }}
             onPage={(next) => (away(), setPage(next))}
@@ -1261,6 +1533,14 @@ export function Studio() {
             </IconButton>
             {fold.tip}
           </span>
+          {folded && page === 'studio' && shown && (
+            <span {...fresh.hover} className="is-tipwrap">
+              <IconButton aria-label="New picture" onClick={newPicture}>
+                <Icon name="add-line" size={16} />
+              </IconButton>
+              {fresh.tip}
+            </span>
+          )}
           <span className="is-bar-title">{title}</span>
           {page === 'studio' && <StageBar {...stageProps} />}
         </div>
@@ -1279,13 +1559,31 @@ export function Studio() {
                     <img src={fileUrl(picture.path)} alt={pictureName(picture)} />
                   </button>
                 ))}
-                {stripLive &&
-                  Array.from({ length: Math.max(1, stripRun.count - strip.length) }, (_, i) => (
-                    <div key={`making-${i}`} className="is-strip-item" data-making>
-                      <Meter value={stripLive.fraction} label="Progress" variant="ring" />
-                    </div>
-                  ))}
-                {stripLive && shown && <span className="is-strip-state">{liveLabel}</span>}
+                {stripLive && plan && step
+                  ? plan.map((each, index) => (
+                      <div
+                        key={each.swatch}
+                        className="is-strip-item is-step hs-tinted"
+                        data-making
+                        data-swatch={each.swatch}
+                        data-selected={index === step.index ? 'true' : undefined}
+                      >
+                        {index < step.index ? (
+                          <Icon name="check-line" size={16} />
+                        ) : index === step.index ? (
+                          <Meter value={stripLive.fraction} label={`${markerName(each.swatch)} area`} variant="ring" />
+                        ) : (
+                          <span className="hs-swatch-dot" />
+                        )}
+                      </div>
+                    ))
+                  : stripLive &&
+                    Array.from({ length: Math.max(1, stripRun.count - strip.length) }, (_, i) => (
+                      <div key={`making-${i}`} className="is-strip-item" data-making>
+                        <Meter value={stripLive.fraction} label="Progress" variant="ring" />
+                      </div>
+                    ))}
+                {stripLive && (!stageLive || plan) && <span className="is-strip-state">{liveLabel}</span>}
                 {stripLive ? (
                   <Button
                     variant="ghost"
@@ -1330,24 +1628,40 @@ export function Studio() {
         )}
         <div className="is-dock">
           {problem && <ProblemNotice problem={problem} onClose={() => setProblem(null)} />}
+          {quickShown && (
+            <div className="is-quick">
+              {QUICK.map((each) => (
+                <Chip key={each.id} icon={<Icon name={each.icon} size={14} />} onClick={() => quick(each.words)}>
+                  {each.label}
+                </Chip>
+              ))}
+            </div>
+          )}
           <PromptBar
+            mode={mode}
             words={words}
             onWords={setWords}
             onSubmit={() => void submit()}
-            action={LABELS[action]}
-            example={EXAMPLES[action]}
+            action={actionLabel}
+            example={mode === 'areas' ? '' : EXAMPLES[mode]}
             ready={ready}
             why={why}
             busy={starting}
-            source={editing ? source : null}
-            references={editing && abilities.edit ? references : []}
-            onDropSource={() => {
-              setSource(null);
-              setReferences([]);
-            }}
+            target={target}
+            references={mode === 'change' && abilities.edit ? references : []}
             onDropReference={(id) => setReferences((before) => before.filter((r) => r.id !== id))}
-            onOpenFile={(file) => void openFile(file)}
-            canAddReference={editing && abilities.edit && references.length < 9}
+            onOpenFile={(file) => void openFile(file, mode === 'make' ? 'stage' : 'prompt')}
+            canAddReference={abilities.edit && references.length < PROMPT_REFERENCES}
+            areas={areas}
+            swatch={swatch}
+            onSwatch={(next) => {
+              setSwatch(next);
+              if (currentTool === 'eraser') setTool('brush');
+            }}
+            onAreaWords={(each, text) => marks.setWords(each, text)}
+            onAreaFile={(each, file) => void openFile(file, each)}
+            onDropAreaReference={(each, id) => marks.dropReference(each, id)}
+            onDropArea={(each) => marks.drop(each)}
             abilities={abilities}
             composer={composer}
             shape={prefs.shape}
@@ -1358,17 +1672,15 @@ export function Studio() {
             onStyle={(style) => setPrefs({ style })}
             count={Math.min(prefs.count, abilities.count)}
             onCount={(count) => setPrefs({ count })}
-            showCount={action !== 'erase' && action !== 'extend' && action !== 'compare'}
-            comparing={action === 'compare'}
+            change={mode === 'change' && !abilities.edit ? prefs.change : null}
+            onChange={(change) => setPrefs({ change })}
             adapters={model ? (models?.adapters ?? []).filter((a) => a.fits?.includes(model.id)) : []}
             loras={prefs.loras}
             onLoras={(loras) => setPrefs({ loras })}
             advanced={advanced}
             onAdvanced={setAdvanced}
             onImprove={chat ? () => void improve() : null}
-            onDescribe={
-              chat?.vision && (editing ? source : shown) ? () => void describe((editing ? source : shown)!) : null
-            }
+            onDescribe={chat?.vision && target ? () => void describe(target) : null}
             helping={helping}
           />
         </div>

@@ -29,7 +29,10 @@ library stays external, because Hearthscale gives every view its own copy.
 
 The backend exists because only it can save a job's pictures into the app's
 data folder (`save` of `ctx.jobs.submit`) and read a picture of that folder
-as an asset a job takes (`ctx.assets.import`).
+as an asset a job takes (`ctx.assets.import`). A change of marked areas is
+the one action whose jobs the view submits itself (`hearthscale/jobs/submit`),
+because the view lays each job's picture into the picture between the jobs;
+see [Marked areas](#marked-areas).
 
 - `make` submits an `image` or `upscale` job on the model the view names: the
   app's model of that kind, which the view follows through
@@ -65,6 +68,7 @@ as an asset a job takes (`ctx.assets.import`).
 | Runs and pictures                     | The app's SQLite database, tables `runs` and `pictures` (`src/records.ts`) |
 | The person's choices                  | The store, key `prefs`                                                  |
 | Masks, uploads, pictures a job reads  | Assets of the app, released when the job ends                           |
+| Marks while the person paints         | One canvas per colour in the view (`src/marks.ts`), never stored        |
 
 A run is one job: what was asked, on which model, from which picture, and
 how it ended. Its pictures are rows of `pictures`. A run still `making` when
@@ -80,17 +84,63 @@ The view shows a picture from the data folder's streamed address
 Image studio names no model. It reads the input schema each model card
 states (`jobs.image.input`) and offers only what that schema takes:
 
-| Field in the schema | What the person gets                                  |
-| ------------------- | ----------------------------------------------------- |
-| `image`             | Change, Vary a little, Vary a lot                     |
-| `mask`              | Brush with Fill and Erase, Extend                     |
-| `references`        | Edit, more pictures in the prompt, Remove background  |
-| `count`             | 1, 2 or 4 pictures a run                              |
-| `negativePrompt`, `steps`, `guidance`, `seed` | The fields of More settings      |
+| Field in the schema | What the person gets                                                                 |
+| ------------------- | ------------------------------------------------------------------------------------ |
+| `image`             | Change the picture, drawn again from it with a Small, Medium or Big change; Vary    |
+| `mask`              | The tool row: Brush, Box, Eraser, the four colours, Invert, Soft edge, and Extend   |
+| `references`        | Change the picture by words, pictures in the prompt and in each area, quick changes |
+| `count`             | 1, 2 or 4 pictures a run                                                             |
+| `negativePrompt`, `steps`, `guidance`, `seed` | The fields of More settings                                |
 
-A text-to-image model can read reference pictures without following them, and
-Hearthscale cannot tell the two apart, so the person chooses between
-**Edit** and **Redraw**.
+Where the schema has `references`, a change of the whole picture is an edit:
+the model reads the picture and the words and changes what the words name.
+Without it, the picture is drawn again from itself, as far as the change size
+says. Hearthscale states `references` also for a text-to-image model of an
+edit model's family, which reads the pictures without following them; such a
+model edits badly, and the person picks another model.
+
+## The prompt follows the stage
+
+The picture on the stage is the picture the prompt changes. With no picture
+on the stage, the prompt makes a new one (**Make**). **New picture**, in the
+library or beside the folded library's press, empties the stage. The prompt
+keeps two sets of words: the words of a new picture, which stay after Make,
+and the words of a change, which clear when the change starts. The main
+button names its result:
+
+| On the stage                  | The prompt                         | The main button                        |
+| ----------------------------- | ---------------------------------- | -------------------------------------- |
+| Nothing                       | Words of a new picture             | Make                                   |
+| A picture, no marks           | Words of a change; quick changes   | Change the picture                     |
+| A picture with marks          | One row per colour                 | Remove 1 area, Change 2 areas, and on  |
+| A picture, the Extend tool    | Words of the new room              | Extend the picture                     |
+
+## Marked areas {#marked-areas}
+
+A pixel belongs to one colour at most: painting in one colour takes the
+pixel from the others, the eraser takes it from every colour, and Invert
+gives a colour every pixel no colour holds. An area with words changes into
+them; an area with no words and no pictures is removed (`REMOVE_WORDS`).
+
+One press is one run of action `mark`, with one job per area, in the order
+the colours were first used (`changeAreas` in `src/Studio.tsx`, `runSteps` in
+`src/runs.ts`):
+
+1. The job takes the current picture as `image`, the area's marks as `mask`
+   (white where it draws anew), `strength` 1, and, where the schema has
+   `references`, the current picture and the area's pictures as
+   `references`.
+2. The view reads the job's picture and lays it into the current picture by
+   the area's blend (`blendOf`): nothing outside the marks, all of it deeper
+   inside the marks than the soft edge, and a smooth rise in between, from a
+   distance transform of the marks. The pixels are read and written exactly
+   (`pixelsOf`, `pngOf`), so a pixel outside the marks keeps its value.
+3. The result is uploaded and is the next job's `image`.
+
+The last picture goes to the run's folder through `keep`, and is named as
+every run's pictures are. The run's `job` holds the job of the area in
+progress. The view drives the run, so a run whose view closed fails when the
+view next opens, unless its job still runs.
 
 The schema states no size of its own, so a picture's size comes from the
 shape and the size the person picks (`src/recipes.ts`), multiples of 64.
@@ -105,3 +155,6 @@ shape and the size the person picks (`src/recipes.ts`), multiples of 64.
 - A job's `mask` must be the size of its `image`, and both multiples of 64. A
   picture the person opens is cut to multiples of 64 when it comes in
   (`src/pictures.ts`).
+- A canvas changes a picture's pixels unless the picture is decoded with
+  `colorSpaceConversion: 'none'` and blended in script, not with the
+  canvas's own compositing: see `pixelsOf` and `blendInto`.

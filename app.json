@@ -2,7 +2,7 @@
   "$schema": "https://hearthscale.com/app.schema.json",
   "id": "image-studio",
   "name": "Image studio",
-  "version": "0.2.6",
+  "version": "0.3.0",
   "api": 7,
   "icon": { "light": "assets/icon-light.svg", "dark": "assets/icon-dark.svg" },
   "description": "Make and change pictures with the image models on this device.",
@@ -32,7 +32,7 @@
     }
   },
   "onboarding": {
-    "version": 1,
+    "version": 2,
     "cards": [
       {
         "title": "Pictures from words.",
@@ -44,8 +44,9 @@
         "title": "Make, then change.",
         "rows": [
           { "icon": "image", "title": "Make", "text": "Write what you want to see, then choose Make." },
-          { "icon": "keyboard", "title": "Edit by words", "text": "Say what to change, such as the season or the light." },
-          { "icon": "pen", "title": "Fill and erase", "text": "Brush over a part to put something new there, or to take it out." },
+          { "icon": "keyboard", "title": "Change by words", "text": "Say what to change, such as the season or the light." },
+          { "icon": "lightbulb", "title": "Quick changes", "text": "Remove all text or a game's interface, or make it night, in one press." },
+          { "icon": "pen", "title": "Mark a part", "text": "Paint over a part, then say what goes there, or leave it empty to remove it." },
           { "icon": "view", "title": "Extend", "text": "Grow the picture past its edges, on the sides you pick." }
         ]
       },
@@ -61,7 +62,7 @@
         "title": "For every day.",
         "rows": [
           { "icon": "image", "title": "Cards and posters", "text": "A watercolour fox for a birthday card." },
-          { "icon": "camera", "title": "Holiday photos", "text": "A stranger erased from the beach." },
+          { "icon": "camera", "title": "Holiday photos", "text": "A stranger removed from the beach." },
           { "icon": "view", "title": "Desktop pictures", "text": "A portrait extended into a wide view." }
         ]
       }

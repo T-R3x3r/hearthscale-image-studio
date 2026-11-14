@@ -1,4 +1,13 @@
-import { useEffect, useLayoutEffect, useRef, useState, type PointerEvent, type ReactNode, type RefObject } from 'react';
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type PointerEvent,
+  type ReactNode,
+  type RefObject,
+} from 'react';
 import {
   Button,
   Chip,
@@ -10,25 +19,26 @@ import {
   MenuSurface,
   PictureCompare,
   Popover,
-  SegmentedControl,
   Slider,
   StatusWord,
   anchorFrom,
   useFloatingTips,
+  type IconName,
   type MenuAnchor,
+  type Swatch,
 } from '@hearthscale/app-ui';
 import { app, assetUrl, fileUrl } from './bridge';
 import { pictureName, type Picture } from './records';
 import type { Live } from './runs';
 import { IDEAS } from './recipes';
-import { paintStrokes, type Margins, type Stroke } from './pictures';
+import type { Margins } from './pictures';
+import { MARKERS, markerName, type Marks, type Point } from './marks';
 import { ProblemNotice } from './Problem';
 import { Details } from './Details';
 
-export type Tool = 'none' | 'brush' | 'extend';
-
-/** How a change of a picture works: by the edit model's words, or drawn again. */
-export type Mode = 'edit' | 'redraw';
+/** What a press on the picture does: paint a colour, draw a box of it,
+ *  erase marks, or grow the picture past its edges. */
+export type Tool = 'brush' | 'rectangle' | 'eraser' | 'extend';
 
 export interface Sides {
   left: boolean;
@@ -38,15 +48,23 @@ export interface Sides {
   share: number;
 }
 
+/** Two pictures side by side: the picture shown and the one it came from,
+ *  or two pictures the person picked. */
+export interface Comparing {
+  before: Picture;
+  beforeName: string;
+  afterName: string;
+  /** The words of the bar's press that ends it. */
+  label: string;
+}
+
 /** What the person can do with the picture on the stage. */
 export interface PictureActions {
-  edit?: () => void;
-  addToPrompt?: () => void;
+  addToPrompt?: { label: string; add: () => void };
   vary?: (how: 'little' | 'lot') => void;
   more?: () => void;
   enlarge?: () => void;
-  plainBackground?: () => void;
-  compareSource?: () => void;
+  beforeAfter?: () => void;
   favourite: () => void;
   save: () => void;
   copy: () => void;
@@ -75,77 +93,112 @@ function useFit(area: RefObject<HTMLElement | null>, width: number, height: numb
   return box;
 }
 
-/** The strokes of the brush over the picture, kept at the picture's own size
- *  and drawn again from the strokes whenever the canvas loses its pixels or
- *  the theme changes its ink. */
-function Brush(props: {
-  strokes: Stroke[];
-  width: number;
-  height: number;
-  size: number;
-  erase: boolean;
-  /** Whether the brush paints; the strokes stay in sight either way. */
-  active: boolean;
-  onStroke: (stroke: Stroke) => void;
-}) {
-  const canvas = useRef<HTMLCanvasElement>(null);
-  const drawing = useRef<Stroke | null>(null);
-  const ink = () => getComputedStyle(canvas.current!).getPropertyValue('--selection-ink').trim();
+/** The marks over the picture, one canvas per colour at the picture's own
+ *  size, and the press that paints, erases or draws a box. */
+function MarkLayer(props: { marks: Marks; tool: Tool; swatch: Swatch; brushSize: number }) {
+  const { marks } = props;
+  const layer = useRef<HTMLDivElement>(null);
+  const ring = useRef<HTMLDivElement>(null);
+  const box = useRef<HTMLDivElement>(null);
+  const press = useRef<{ start: Point; last: Point; size: number } | null>(null);
+  const version = useSyncExternalStore(marks.subscribe, () => marks.version);
+
+  useLayoutEffect(() => {
+    layer.current!.replaceChildren(...marks.areas.map((area) => area.canvas));
+  }, [marks, version]);
 
   useEffect(() => {
-    const element = canvas.current!;
-    const repaint = () => {
-      element.width = props.width;
-      element.height = props.height;
-      paintStrokes(element.getContext('2d')!, props.strokes, ink());
-    };
-    const later = () => requestAnimationFrame(repaint);
-    repaint();
-    element.addEventListener('contextrestored', repaint);
+    const later = () => requestAnimationFrame(() => marks.recolor());
     app.addEventListener('hostcontextchanged', later);
-    return () => {
-      element.removeEventListener('contextrestored', repaint);
-      app.removeEventListener('hostcontextchanged', later);
-    };
-  }, [props.strokes, props.width, props.height]);
+    return () => app.removeEventListener('hostcontextchanged', later);
+  }, [marks]);
 
-  const at = (event: PointerEvent<HTMLCanvasElement>) => {
+  const at = (event: PointerEvent<HTMLElement>) => {
     const rect = event.currentTarget.getBoundingClientRect();
     return {
-      x: ((event.clientX - rect.left) / rect.width) * props.width,
-      y: ((event.clientY - rect.top) / rect.height) * props.height,
-      scale: props.width / rect.width,
+      point: {
+        x: ((event.clientX - rect.left) / rect.width) * marks.width,
+        y: ((event.clientY - rect.top) / rect.height) * marks.height,
+      },
+      local: { x: event.clientX - rect.left, y: event.clientY - rect.top },
+      scale: marks.width / rect.width,
     };
   };
-  const extend = (event: PointerEvent<HTMLCanvasElement>) => {
-    const stroke = drawing.current;
-    if (!stroke) return;
-    const { x, y } = at(event);
-    const last = stroke.points[stroke.points.length - 1];
-    stroke.points.push({ x, y });
-    paintStrokes(canvas.current!.getContext('2d')!, [{ ...stroke, points: [last, { x, y }] }], ink());
+  const painting = props.tool === 'brush' || props.tool === 'eraser';
+  const paint = (from: Point, to: Point, size: number) =>
+    marks.stroke(props.tool === 'eraser' ? null : props.swatch, from, to, size);
+
+  const placeRing = (local: Point) => {
+    const element = ring.current;
+    if (!element) return;
+    element.style.transform = `translate(${local.x - props.brushSize / 2}px, ${local.y - props.brushSize / 2}px)`;
+    element.dataset.shown = 'true';
   };
-  const finish = () => {
-    if (drawing.current) props.onStroke(drawing.current);
-    drawing.current = null;
+  const placeBox = (from: Point, to: Point, scale: number) => {
+    const element = box.current!;
+    element.style.left = `${Math.min(from.x, to.x) / scale}px`;
+    element.style.top = `${Math.min(from.y, to.y) / scale}px`;
+    element.style.width = `${Math.abs(to.x - from.x) / scale}px`;
+    element.style.height = `${Math.abs(to.y - from.y) / scale}px`;
   };
+  const finish = (event: PointerEvent<HTMLDivElement>) => {
+    const pressed = press.current;
+    press.current = null;
+    if (!pressed) return;
+    if (props.tool === 'rectangle') {
+      const { point } = at(event);
+      box.current!.dataset.shown = 'false';
+      const x = Math.max(0, Math.min(pressed.start.x, point.x));
+      const y = Math.max(0, Math.min(pressed.start.y, point.y));
+      const width = Math.min(marks.width, Math.max(pressed.start.x, point.x)) - x;
+      const height = Math.min(marks.height, Math.max(pressed.start.y, point.y)) - y;
+      if (width >= 1 && height >= 1) marks.rectangle(props.swatch, x, y, width, height);
+    }
+    marks.settle();
+  };
+
   return (
-    <canvas
-      ref={canvas}
-      className="is-strokes"
-      data-active={props.active}
+    <div
+      className="is-marks"
+      data-tool={props.tool}
       onPointerDown={(event) => {
+        if (event.button !== 0) return;
         event.currentTarget.setPointerCapture(event.pointerId);
-        const { x, y, scale } = at(event);
-        drawing.current = { size: props.size * scale, erase: props.erase, points: [{ x, y }] };
-        paintStrokes(canvas.current!.getContext('2d')!, [drawing.current], ink());
+        const { point, scale } = at(event);
+        const size = props.brushSize * scale;
+        press.current = { start: point, last: point, size };
+        if (painting) paint(point, point, size);
+        else {
+          box.current!.dataset.shown = 'true';
+          placeBox(point, point, scale);
+        }
       }}
       onPointerMove={(event) => {
-        if (event.buttons === 1) extend(event);
+        const { point, local, scale } = at(event);
+        if (painting) placeRing(local);
+        const pressed = press.current;
+        if (!pressed || event.buttons !== 1) return;
+        if (painting) paint(pressed.last, point, pressed.size);
+        else placeBox(pressed.start, point, scale);
+        pressed.last = point;
       }}
       onPointerUp={finish}
       onPointerCancel={finish}
-    />
+      onPointerLeave={() => {
+        if (ring.current) ring.current.dataset.shown = 'false';
+      }}
+    >
+      <div ref={layer} className="is-marks-layers" />
+      {painting && (
+        <div
+          ref={ring}
+          className="is-mark-ring"
+          data-shown="false"
+          style={{ width: props.brushSize, height: props.brushSize }}
+        />
+      )}
+      <div ref={box} className="is-mark-box" data-swatch={props.swatch} data-shown="false" />
+    </div>
   );
 }
 
@@ -177,7 +230,7 @@ interface BarSliderSpec {
 
 /** Sliders of the bar: each beside its label, or in a compact bar behind
  *  one press of the first one's label, which opens them all, each under
- *  its label where there are more than one. */
+ *  its label. */
 function BarSlider(props: { compact: boolean; sliders: BarSliderSpec[] }) {
   const [at, setAt] = useState<HTMLElement | null>(null);
   const slider = (spec: BarSliderSpec) => (
@@ -203,7 +256,7 @@ function BarSlider(props: { compact: boolean; sliders: BarSliderSpec[] }) {
       </>
     );
   }
-  const label = props.sliders[0].label;
+  const title = props.sliders[0].label;
   return (
     <>
       <Button
@@ -212,19 +265,17 @@ function BarSlider(props: { compact: boolean; sliders: BarSliderSpec[] }) {
         trailingIcon={<Icon name="arrow-down-s-line" size={14} />}
         onClick={(e) => setAt(e.currentTarget)}
       >
-        {label}
+        {title}
       </Button>
       {at && (
-        <Popover anchor={at} placement="bottom-end" label={label} onDismiss={() => setAt(null)}>
+        <Popover anchor={at} placement="bottom" label={title} onDismiss={() => setAt(null)}>
           <div className="is-bar-popover">
-            {props.sliders.length === 1
-              ? slider(props.sliders[0])
-              : props.sliders.map((spec) => (
-                  <div key={spec.label} className="hs-text-field">
-                    <span className="hs-field-label">{spec.label}</span>
-                    {slider(spec)}
-                  </div>
-                ))}
+            {props.sliders.map((spec) => (
+              <div key={spec.label} className="hs-text-field">
+                <span className="hs-field-label">{spec.label}</span>
+                {slider(spec)}
+              </div>
+            ))}
           </div>
         </Popover>
       )}
@@ -232,17 +283,17 @@ function BarSlider(props: { compact: boolean; sliders: BarSliderSpec[] }) {
   );
 }
 
-/** What the stage and its bar show, and what they report. */
+/** What the stage, its tool row and its bar show, and what they report. */
 export interface StageProps {
   /** Whether the bar keeps only its main actions and puts the rest in the More menu. */
   narrow: boolean;
-  /** Whether the tools' bars put their sides and their sliders behind presses that open them. */
+  /** Whether the tool row puts its colours, sides and sliders behind presses that open them. */
   compact: boolean;
   picture: Picture | null;
   size: { width: number; height: number } | null;
-  source: Picture | null;
-  comparing: { before: Picture; beforeName: string; afterName: string } | null;
+  comparing: Comparing | null;
   onStopCompare: () => void;
+  /** The run the stage shows while it runs, in place of its picture. */
   live: Live | null;
   /** The task in progress, such as "Making…". */
   liveLabel: string;
@@ -256,35 +307,28 @@ export interface StageProps {
   suggestion: { label: string; downloading: boolean; license?: string } | null;
   onInstall: () => void;
   onIdea: (words: string) => void;
+  /** Whether the picture takes marks and Extend: the model draws a part of a picture anew. */
+  markable: boolean;
   tool: Tool;
   onTool: (tool: Tool) => void;
-  strokes: Stroke[];
+  marks: Marks;
+  swatch: Swatch;
+  onSwatch: (swatch: Swatch) => void;
   brushSize: number;
   onBrushSize: (size: number) => void;
-  erasing: boolean;
-  onErasing: (on: boolean) => void;
-  painted: boolean;
-  onStroke: (stroke: Stroke) => void;
-  onClearStrokes: () => void;
+  softEdge: number;
+  onSoftEdge: (soft: number) => void;
   sides: Sides;
   onSides: (sides: Sides) => void;
   margins: Margins | null;
-  mode: Mode;
-  onMode: (mode: Mode) => void;
-  /** How far a change may move from the picture, where the action takes it. */
-  amount: number | null;
-  onAmount: (amount: number) => void;
-  /** Whether the model can change a picture both ways, so the bar offers the choice. */
-  showMode: boolean;
   actions: PictureActions | null;
-  onStopEditing: () => void;
 }
 
 export function Stage(props: StageProps) {
   const area = useRef<HTMLDivElement>(null);
   const tips = useFloatingTips('top');
   const { picture, size, margins } = props;
-  const isSource = !!picture && picture.id === props.source?.id;
+  const marking = props.markable && props.tool !== 'extend' && !props.comparing && !props.live;
   const framed =
     size && margins
       ? { width: size.width + margins.left + margins.right, height: size.height + margins.top + margins.bottom }
@@ -298,7 +342,30 @@ export function Stage(props: StageProps) {
   );
 
   let body;
-  if (props.comparing && picture) {
+  if (props.live) {
+    body = (
+      <div className="is-making">
+        {props.live.preview ? (
+          <img className="is-preview" src={assetUrl(props.live.preview)} alt="The picture so far" />
+        ) : (
+          <Icon name="image-ai-line" size={40} className="is-making-mark" />
+        )}
+        <div className="is-making-state">
+          {props.live.waiting ? (
+            <span {...waiting.hover} className="is-tipwrap">
+              <StatusWord tone="info">Waiting</StatusWord>
+              {waiting.tip}
+            </span>
+          ) : (
+            <span {...runsOn.hover} className="is-tipwrap">
+              {props.liveLabel}
+              {runsOn.tip}
+            </span>
+          )}
+        </div>
+      </div>
+    );
+  } else if (props.comparing && picture) {
     body = (
       <div className="is-compare-one" style={{ width: box.width }}>
         <PictureCompare
@@ -330,43 +397,12 @@ export function Stage(props: StageProps) {
               : undefined
           }
         />
-        {props.actions && props.tool === 'none' && !props.painted && (
-          <button className="is-frame-open" aria-label="View large" onClick={props.actions.large} />
-        )}
-        {(props.tool === 'brush' || props.painted) && isSource && (
-          <Brush
-            strokes={props.strokes}
-            width={size.width}
-            height={size.height}
-            size={props.brushSize}
-            erase={props.erasing}
-            active={props.tool === 'brush'}
-            onStroke={props.onStroke}
-          />
-        )}
-      </div>
-    );
-  } else if (props.live) {
-    body = (
-      <div className="is-making">
-        {props.live.preview ? (
-          <img className="is-preview" src={assetUrl(props.live.preview)} alt="The picture so far" />
+        {marking ? (
+          <MarkLayer marks={props.marks} tool={props.tool} swatch={props.swatch} brushSize={props.brushSize} />
         ) : (
-          <Icon name="image-ai-line" size={40} className="is-making-mark" />
+          props.actions &&
+          !props.markable && <button className="is-frame-open" aria-label="View large" onClick={props.actions.large} />
         )}
-        <div className="is-making-state">
-          {props.live.waiting ? (
-            <span {...waiting.hover} className="is-tipwrap">
-              <StatusWord tone="info">Waiting</StatusWord>
-              {waiting.tip}
-            </span>
-          ) : (
-            <span {...runsOn.hover} className="is-tipwrap">
-              {props.liveLabel}
-              {runsOn.tip}
-            </span>
-          )}
-        </div>
       </div>
     );
   } else if (props.noModel) {
@@ -402,6 +438,7 @@ export function Stage(props: StageProps) {
 
   return (
     <div className="is-stage">
+      {props.markable && picture && !props.comparing && !props.live && <MarkBar {...props} />}
       <div className="is-stage-area" ref={area}>
         {body}
       </div>
@@ -409,98 +446,46 @@ export function Stage(props: StageProps) {
   );
 }
 
-/** The actions of the picture on the stage, or the options of the tool in use. */
-export function StageBar(props: StageProps) {
-  const [menu, setMenu] = useState<MenuAnchor | null>(null);
+/** The tools of the picture: the brush, the box and the eraser with the
+ *  colour they mark in, or the sides Extend grows. */
+function MarkBar(props: StageProps) {
+  const [colours, setColours] = useState<MenuAnchor | null>(null);
   const [sidesMenu, setSidesMenu] = useState<MenuAnchor | null>(null);
-  const [varyMenu, setVaryMenu] = useState<MenuAnchor | null>(null);
-  const [detailsAt, setDetailsAt] = useState<HTMLElement | null>(null);
   const tips = useFloatingTips('bottom');
-  const { picture } = props;
-  const isSource = !!picture && picture.id === props.source?.id;
-  const actions = props.actions;
-  const tip = (key: string, text: string) => tips(key, text);
-  /** A control with a tooltip that explains the app's word on it. */
+  const name = markerName(props.swatch);
   const explained = (key: string, text: string, control: ReactNode) => {
-    const t = tip(key, text);
+    const t = tips(key, text);
     return (
-      <span {...t.hover} className="is-tipwrap">
+      <span key={key} {...t.hover} className="is-tipwrap">
         {control}
         {t.tip}
       </span>
     );
   };
-
-  const amountSlider: BarSliderSpec | null =
-    props.amount === null
-      ? null
-      : {
-          label: 'Amount',
-          min: 0.05,
-          max: 1,
-          step: 0.05,
-          value: props.amount,
-          onChange: props.onAmount,
-          shown: `${Math.round(props.amount * 100)}%`,
-        };
-  const brushSlider: BarSliderSpec = {
-    label: 'Brush size',
-    min: 8,
-    max: 160,
-    step: 4,
-    value: props.brushSize,
-    onChange: props.onBrushSize,
-    shown: `${props.brushSize}`,
-  };
-  const amount =
-    amountSlider &&
+  const tool = (id: Tool, icon: IconName, label: string, text: string) =>
     explained(
-      'amount',
-      'How far the new picture may move from this one',
-      <BarSlider compact={props.compact} sliders={[amountSlider]} />,
+      `tool-${id}`,
+      text,
+      <IconButton
+        aria-label={label}
+        aria-pressed={props.tool === id}
+        className={props.tool === id ? 'hs-boxsel' : undefined}
+        onClick={() => props.onTool(id)}
+      >
+        <Icon name={icon} size={16} />
+      </IconButton>,
     );
+  const marked = !!props.marks.find(props.swatch);
 
-  let bar = null;
-  if (props.comparing) {
-    bar = (
-      <Button variant="ghost" size="sm" icon={<Icon name="arrow-left-line" size={14} />} onClick={props.onStopCompare}>
-        Back to the picture
-      </Button>
-    );
-  } else if (isSource && props.tool === 'brush') {
-    bar = (
-      <>
-        {props.narrow && amountSlider ? (
-          <BarSlider compact sliders={[brushSlider, amountSlider]} />
-        ) : (
-          <>
-            {amount}
-            <BarSlider compact={props.compact} sliders={[brushSlider]} />
-          </>
-        )}
-        {explained(
-          'eraser',
-          'Rub out brush strokes',
-          <BarToggle on={props.erasing} onClick={() => props.onErasing(!props.erasing)}>
-            Rub out
-          </BarToggle>,
-        )}
-        <Button variant="ghost" size="sm" onClick={props.onClearStrokes}>
-          Clear
-        </Button>
-        <Button variant="secondary" size="sm" onClick={() => props.onTool('none')}>
-          Done
-        </Button>
-      </>
-    );
-  } else if (isSource && props.tool === 'extend') {
+  let options: ReactNode;
+  if (props.tool === 'extend') {
     const flip = (side: 'left' | 'right' | 'top' | 'bottom') =>
       props.onSides({ ...props.sides, [side]: !props.sides[side] });
     const sides = (['left', 'right', 'top', 'bottom'] as const).map((side) => ({
       side,
       label: side[0].toUpperCase() + side.slice(1),
     }));
-    bar = (
+    options = (
       <>
         {props.compact ? (
           <Button
@@ -539,97 +524,165 @@ export function StageBar(props: StageProps) {
             },
           ]}
         />
-        <Button variant="secondary" size="sm" onClick={() => props.onTool('none')}>
-          Done
-        </Button>
       </>
     );
-  } else if (isSource) {
-    bar = (
+  } else {
+    const sliders: BarSliderSpec[] = [
+      ...(props.tool === 'rectangle'
+        ? []
+        : [
+            {
+              label: 'Brush size',
+              min: 8,
+              max: 160,
+              step: 4,
+              value: props.brushSize,
+              onChange: props.onBrushSize,
+              shown: `${props.brushSize}`,
+            },
+          ]),
+      {
+        label: 'Soft edge',
+        min: 0,
+        max: 48,
+        step: 4,
+        value: props.softEdge,
+        onChange: props.onSoftEdge,
+        shown: props.softEdge === 0 ? 'Off' : `${props.softEdge}`,
+      },
+    ];
+    const invert = (
+      <IconButton aria-label="Invert" disabled={!marked} onClick={() => props.marks.invert(props.swatch)}>
+        <Icon name="contrast-line" size={16} />
+      </IconButton>
+    );
+    options = (
       <>
-        {amount}
-        {props.showMode &&
-          explained(
-            'mode',
-            'Edit changes what you name; Redraw paints the picture again from your words',
-            <SegmentedControl
-              label="How to change the picture"
-              value={props.mode}
-              options={[
-                { value: 'edit', label: 'Edit' },
-                { value: 'redraw', label: 'Redraw' },
-              ]}
-              onChange={props.onMode}
-            />,
-          )}
-        {props.narrow ? (
+        <span className="is-bar-divider" />
+        {props.compact ? (
           <>
             {explained(
-              'brush',
-              'Brush: paint over a part to fill it or erase it',
-              <IconButton aria-label="Brush" onClick={() => props.onTool('brush')}>
-                <Icon name="paint-brush-line" size={16} />
-              </IconButton>,
+              'colour',
+              'Colour: each colour marks one area',
+              <button
+                type="button"
+                className="is-colour-pick hs-hovbox-ink"
+                data-swatch={props.swatch}
+                aria-label={`Colour, ${name}`}
+                onClick={(e) => setColours(anchorFrom('colours', e))}
+              >
+                <span className="hs-swatch-dot" />
+                <Icon name="arrow-down-s-line" size={14} />
+              </button>,
             )}
-            {explained(
-              'extend',
-              'Extend: grow the picture past its edges',
-              <IconButton aria-label="Extend" onClick={() => props.onTool('extend')}>
-                <Icon name="expand-diagonal-line" size={16} />
-              </IconButton>,
-            )}
-            {explained(
-              'stop',
-              'Stop editing',
-              <IconButton aria-label="Stop editing" onClick={props.onStopEditing}>
-                <Icon name="close-line" size={16} />
-              </IconButton>,
+            {colours && (
+              <MenuSurface anchor={colours} dir="down" onDismiss={() => setColours(null)}>
+                {MARKERS.map((marker) => (
+                  <MItem
+                    key={marker.swatch}
+                    icon={<span data-swatch={marker.swatch} className="hs-swatch-dot" />}
+                    label={marker.name}
+                    checked={marker.swatch === props.swatch}
+                    onClick={() => (setColours(null), props.onSwatch(marker.swatch))}
+                  />
+                ))}
+              </MenuSurface>
             )}
           </>
         ) : (
-          <>
-            {explained(
-              'brush',
-              'Paint over a part to fill it or erase it',
-              <Button
-                variant="ghost"
-                size="sm"
-                icon={<Icon name="paint-brush-line" size={14} />}
-                onClick={() => props.onTool('brush')}
-              >
-                Brush
-              </Button>,
+          <span className="is-colours" role="radiogroup" aria-label="Colour">
+            {MARKERS.map((marker) =>
+              explained(
+                `colour-${marker.swatch}`,
+                `Mark in ${marker.name.toLowerCase()}`,
+                <button
+                  type="button"
+                  role="radio"
+                  className={`is-colour hs-hovbox-ink ${marker.swatch === props.swatch ? 'hs-boxsel' : ''}`}
+                  data-swatch={marker.swatch}
+                  aria-checked={marker.swatch === props.swatch}
+                  aria-label={marker.name}
+                  onClick={() => props.onSwatch(marker.swatch)}
+                >
+                  <span className="hs-swatch-dot" />
+                </button>,
+              ),
             )}
-            {explained(
-              'extend',
-              'Grow the picture past its edges',
-              <Button
-                variant="ghost"
-                size="sm"
-                icon={<Icon name="expand-diagonal-line" size={14} />}
-                onClick={() => props.onTool('extend')}
-              >
-                Extend
-              </Button>,
-            )}
-            <Button variant="ghost" size="sm" icon={<Icon name="close-line" size={14} />} onClick={props.onStopEditing}>
-              Stop editing
-            </Button>
-          </>
+          </span>
+        )}
+        <BarSlider compact={props.compact} sliders={sliders} />
+        {explained(
+          'invert',
+          marked
+            ? `Mark everything except the ${name.toLowerCase()} marks`
+            : `Mark a part in ${name.toLowerCase()} first`,
+          invert,
         )}
       </>
     );
+  }
+
+  return (
+    <div className="is-markbar">
+      <span className="is-tools" role="toolbar" aria-label="Tools">
+        {tool('brush', 'paint-brush-line', 'Brush', 'Brush: paint over a part to change it')}
+        {tool('rectangle', 'rectangle-line', 'Box', 'Box: drag over a part to change it')}
+        {tool('eraser', 'eraser-line', 'Eraser', 'Eraser: erase marks')}
+        {tool('extend', 'expand-diagonal-line', 'Extend', 'Extend: grow the picture past its edges')}
+      </span>
+      {options}
+    </div>
+  );
+}
+
+/** The actions of the picture on the stage. */
+export function StageBar(props: StageProps) {
+  const [menu, setMenu] = useState<MenuAnchor | null>(null);
+  const [varyMenu, setVaryMenu] = useState<MenuAnchor | null>(null);
+  const [detailsAt, setDetailsAt] = useState<HTMLElement | null>(null);
+  const tips = useFloatingTips('bottom');
+  const { picture } = props;
+  const actions = props.actions;
+  /** A control with a tooltip that explains the app's word on it. */
+  const explained = (key: string, text: string, control: ReactNode) => {
+    const t = tips(key, text);
+    return (
+      <span {...t.hover} className="is-tipwrap">
+        {control}
+        {t.tip}
+      </span>
+    );
+  };
+
+  let bar = null;
+  if (props.comparing) {
+    bar = (
+      <BarToggle on onClick={props.onStopCompare}>
+        {props.comparing.label}
+      </BarToggle>
+    );
   } else if (picture && actions) {
-    const favourite = tip('favourite', picture.favourite ? 'Remove from favourites' : 'Add to favourites');
-    const save = tip('save', 'Save as…');
-    const more = tip('more', 'More');
+    const favourite = tips('favourite', picture.favourite ? 'Remove from favourites' : 'Add to favourites');
+    const save = tips('save', 'Save as…');
+    const more = tips('more', 'More');
     bar = (
       <>
-        {actions.edit && (
-          <Button variant="ghost" size="sm" icon={<Icon name="image-edit-line" size={14} />} onClick={actions.edit}>
-            Edit this
-          </Button>
-        )}
+        {actions.beforeAfter &&
+          (props.narrow
+            ? explained(
+                'before-after',
+                'Before and after',
+                <IconButton aria-label="Before and after" onClick={actions.beforeAfter}>
+                  <Icon name="split-cells-horizontal" size={16} />
+                </IconButton>,
+              )
+            : explained(
+                'before-after',
+                'Slide to see the picture before this change',
+                <BarToggle on={false} onClick={actions.beforeAfter}>
+                  Before and after
+                </BarToggle>,
+              ))}
         {actions.vary &&
           !props.narrow &&
           explained(
@@ -725,22 +778,8 @@ export function StageBar(props: StageProps) {
           {actions.addToPrompt && (
             <MItem
               icon={<Icon name="image-add-line" size={14} />}
-              label="Add to the prompt"
-              onClick={() => (setMenu(null), actions.addToPrompt!())}
-            />
-          )}
-          {actions.plainBackground && (
-            <MItem
-              icon={<Icon name="scissors-cut-line" size={14} />}
-              label="Remove background"
-              onClick={() => (setMenu(null), actions.plainBackground!())}
-            />
-          )}
-          {actions.compareSource && (
-            <MItem
-              icon={<Icon name="contrast-2-line" size={14} />}
-              label="Compare with the original"
-              onClick={() => (setMenu(null), actions.compareSource!())}
+              label={actions.addToPrompt.label}
+              onClick={() => (setMenu(null), actions.addToPrompt!.add())}
             />
           )}
           <MItem

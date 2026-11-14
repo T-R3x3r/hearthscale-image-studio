@@ -2,6 +2,7 @@ import { useLayoutEffect, useRef, useState, type MouseEvent, type ReactNode, typ
 import {
   Button,
   Icon,
+  IconButton,
   MDivider,
   MItem,
   MSection,
@@ -14,12 +15,14 @@ import {
   useFloatingTips,
   type IconName,
   type MenuAnchor,
+  type Swatch,
 } from '@hearthscale/app-ui';
 import { call, fileUrl } from './bridge';
 import { pictureName, type Picture } from './records';
 import type { Abilities, Lora } from './models';
 import type { ModelCard } from '@hearthscale/app';
-import { SHAPES, SIZES, STYLES, type ShapeId, type SizeId } from './recipes';
+import { CHANGES, SHAPES, SIZES, STYLES, type ChangeId, type ShapeId, type SizeId } from './recipes';
+import { AREA_REFERENCES, markerName, type Area } from './marks';
 
 export interface Advanced {
   negative: string;
@@ -232,7 +235,102 @@ function Loras(props: { adapters: ModelCard[]; on: Lora[]; onChange: (on: Lora[]
   );
 }
 
+/** What the prompt makes: a new picture, a change of the picture shown,
+ *  a change of its marked areas, a larger picture, or one picture of
+ *  each model to compare. */
+export type PromptMode = 'make' | 'change' | 'areas' | 'extend' | 'compare';
+
+/** One marked area as a row of the prompt: its colour, what goes there,
+ *  its pictures, and the press that deletes its marks. */
+function AreaRow(props: {
+  area: Area;
+  current: boolean;
+  references: boolean;
+  onSwatch: () => void;
+  onWords: (words: string) => void;
+  onFile: (file: File) => void;
+  onDropReference: (id: string) => void;
+  onDrop: () => void;
+  onSubmit: () => void;
+}) {
+  const { area } = props;
+  const file = useRef<HTMLInputElement>(null);
+  const tips = useFloatingTips('top');
+  const name = markerName(area.swatch).toLowerCase();
+  const pick = tips('pick', `Mark in ${name}`);
+  const add = tips('add', `Add a picture of what goes in the ${name} area`);
+  const drop = tips('drop', `Delete the ${name} marks`);
+  return (
+    <div className="is-area" data-swatch={area.swatch} data-current={props.current}>
+      <span {...pick.hover} className="is-tipwrap">
+        <button
+          type="button"
+          className={`is-colour hs-hovbox-ink ${props.current ? 'hs-boxsel' : ''}`}
+          aria-label={`Mark in ${name}`}
+          aria-pressed={props.current}
+          onClick={props.onSwatch}
+        >
+          <span className="hs-swatch-dot" />
+        </button>
+        {pick.tip}
+      </span>
+      <input
+        className="is-area-words"
+        value={area.words}
+        placeholder={area.references.length ? 'What the added picture shows' : 'Remove what is marked'}
+        aria-label={`${markerName(area.swatch)} area`}
+        onFocus={props.onSwatch}
+        onChange={(e) => props.onWords(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
+            e.preventDefault();
+            props.onSubmit();
+          }
+        }}
+      />
+      {area.references.map((picture) => (
+        <div key={picture.id} className="is-area-picture">
+          <img className="is-shelf-picture" src={fileUrl(picture.path)} alt={pictureName(picture)} />
+          <button
+            className="hs-shelf-remove"
+            aria-label={`Remove from the ${name} area`}
+            onClick={() => props.onDropReference(picture.id)}
+          >
+            <Icon name="close-line" size={12} />
+          </button>
+        </div>
+      ))}
+      {props.references && area.references.length < AREA_REFERENCES && (
+        <span {...add.hover} className="is-tipwrap">
+          <IconButton size="sm" aria-label={`Add a picture to the ${name} area`} onClick={() => file.current?.click()}>
+            <Icon name="image-add-line" size={14} />
+          </IconButton>
+          {add.tip}
+        </span>
+      )}
+      <input
+        ref={file}
+        type="file"
+        accept="image/png,image/jpeg,image/webp"
+        hidden
+        onChange={(e) => {
+          const picked = e.target.files?.[0];
+          e.target.value = '';
+          if (picked) props.onFile(picked);
+        }}
+      />
+      <span {...drop.hover} className="is-tipwrap">
+        <IconButton size="sm" aria-label={`Delete the ${name} marks`} onClick={props.onDrop}>
+          <Icon name="delete-bin-line" size={14} />
+        </IconButton>
+        {drop.tip}
+      </span>
+    </div>
+  );
+}
+
 export function PromptBar(props: {
+  mode: PromptMode;
   words: string;
   onWords: (words: string) => void;
   onSubmit: () => void;
@@ -243,12 +341,19 @@ export function PromptBar(props: {
   /** Why the action is off, where the person can change that. */
   why: string | null;
   busy: boolean;
-  source: Picture | null;
+  /** The picture the words change, shown first among the pictures of the prompt. */
+  target: Picture | null;
   references: Picture[];
-  onDropSource: () => void;
   onDropReference: (id: string) => void;
   onOpenFile: (file: File) => void;
   canAddReference: boolean;
+  areas: Area[];
+  swatch: Swatch;
+  onSwatch: (swatch: Swatch) => void;
+  onAreaWords: (swatch: Swatch, words: string) => void;
+  onAreaFile: (swatch: Swatch, file: File) => void;
+  onDropAreaReference: (swatch: Swatch, id: string) => void;
+  onDropArea: (swatch: Swatch) => void;
   abilities: Abilities;
   /** The composer's box, which the view's toast sits above. */
   composer: RefObject<HTMLDivElement | null>;
@@ -260,8 +365,9 @@ export function PromptBar(props: {
   onStyle: (style: string | null) => void;
   count: number;
   onCount: (count: number) => void;
-  showCount: boolean;
-  comparing: boolean;
+  /** How far a change of the whole picture moves from it, where the model draws it again. */
+  change: ChangeId | null;
+  onChange: (change: ChangeId) => void;
   adapters: ModelCard[];
   loras: Lora[];
   onLoras: (loras: Lora[]) => void;
@@ -276,12 +382,14 @@ export function PromptBar(props: {
   const short = useShortRow(footer);
   const [advancedAt, setAdvancedAt] = useState<HTMLElement | null>(null);
   const tips = useFloatingTips('top');
+  const { mode } = props;
   const set = (field: keyof Advanced) => (e: { target: { value: string } }) =>
     props.onAdvanced({ ...props.advanced, [field]: e.target.value });
-  const add = tips('add', props.source ? 'Add a picture to the prompt' : 'Open a picture');
+  const add = tips('add', mode === 'make' ? 'Open a picture' : 'Add a picture to the prompt');
   const improve = tips('improve', 'Improve my words');
-  const describe = tips('describe', 'Describe this picture');
+  const describe = tips('describe', 'Describe this picture as words for a new picture');
   const off = tips('why', props.why ?? undefined);
+  const changeTip = tips('change', 'How far the picture may move from this one');
   const { negative, steps, guidance, seed } = props.abilities;
   const settable = negative || steps || guidance || seed;
   const more = tips('advanced', settable ? 'More settings' : 'This model takes no more settings');
@@ -295,7 +403,10 @@ export function PromptBar(props: {
       </span>
     );
   };
-  const chips = [props.source, ...props.references].filter((p): p is Picture => !!p);
+  const chips =
+    mode === 'change' && props.target && props.references.length > 0 ? [props.target, ...props.references] : [];
+  const worded = mode === 'make' || mode === 'change' || mode === 'extend' || mode === 'compare';
+  const styled = mode === 'make' || mode === 'change' || mode === 'compare';
 
   return (
     <div className="hs-composer" ref={props.composer}>
@@ -306,40 +417,61 @@ export function PromptBar(props: {
               {chips.map((picture, index) => (
                 <div key={picture.id} className="hs-shelf-tile">
                   <img className="is-shelf-picture" src={fileUrl(picture.path)} alt={pictureName(picture)} />
-                  {chips.length > 1 && <span className="is-prompt-number">{index + 1}</span>}
-                  <button
-                    className="hs-shelf-remove"
-                    aria-label="Remove from the prompt"
-                    onClick={() => (index === 0 ? props.onDropSource() : props.onDropReference(picture.id))}
-                  >
-                    <Icon name="close-line" size={12} />
-                  </button>
+                  <span className="is-prompt-number">{index + 1}</span>
+                  {index > 0 && (
+                    <button
+                      className="hs-shelf-remove"
+                      aria-label="Remove from the prompt"
+                      onClick={() => props.onDropReference(picture.id)}
+                    >
+                      <Icon name="close-line" size={12} />
+                    </button>
+                  )}
                 </div>
               ))}
             </div>
           </div>
         )}
-        <div className="hs-composer-field">
-          <textarea
-            className="hs-composer-editor is-words"
-            rows={2}
-            value={props.words}
-            placeholder={props.example}
-            aria-label="Prompt"
-            onChange={(e) => props.onWords(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
-                e.preventDefault();
-                if (props.ready) props.onSubmit();
-              }
-            }}
-          />
-        </div>
+        {mode === 'areas' ? (
+          <div className="is-areas">
+            {props.areas.map((area) => (
+              <AreaRow
+                key={area.swatch}
+                area={area}
+                current={area.swatch === props.swatch}
+                references={props.abilities.edit}
+                onSwatch={() => props.onSwatch(area.swatch)}
+                onWords={(words) => props.onAreaWords(area.swatch, words)}
+                onFile={(picked) => props.onAreaFile(area.swatch, picked)}
+                onDropReference={(id) => props.onDropAreaReference(area.swatch, id)}
+                onDrop={() => props.onDropArea(area.swatch)}
+                onSubmit={() => props.ready && props.onSubmit()}
+              />
+            ))}
+          </div>
+        ) : (
+          <div className="hs-composer-field">
+            <textarea
+              className="hs-composer-editor is-words"
+              rows={2}
+              value={props.words}
+              placeholder={props.example}
+              aria-label="Prompt"
+              onChange={(e) => props.onWords(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
+                  e.preventDefault();
+                  if (props.ready) props.onSubmit();
+                }
+              }}
+            />
+          </div>
+        )}
         <div ref={footer} className="hs-composer-footer is-prompt-row" data-short={short ? 'true' : undefined}>
-          {!props.comparing && (!props.source || props.canAddReference) && (
+          {(mode === 'make' || (mode === 'change' && props.canAddReference)) && (
             <span {...add.hover} className="is-tipwrap">
               <Tool
-                label={props.source ? 'Add a picture to the prompt' : 'Open a picture'}
+                label={mode === 'make' ? 'Open a picture' : 'Add a picture to the prompt'}
                 icon="attachment-2"
                 onClick={() => file.current?.click()}
               />
@@ -357,65 +489,91 @@ export function PromptBar(props: {
               if (picked) props.onOpenFile(picked);
             }}
           />
-          {!props.source && (
-            <>
+          {(mode === 'make' || mode === 'compare') && (
+            <Menu
+              label="Shape and size"
+              value={`${SHAPES.find((s) => s.id === props.shape)!.label}, ${SIZES.find((s) => s.id === props.size)!.label.toLowerCase()}`}
+              icon={<Icon name="aspect-ratio-line" size={14} />}
+              short={short}
+            >
+              {(close) => (
+                <>
+                  <MSection>Shape</MSection>
+                  {SHAPES.map((shape) => (
+                    <MItem
+                      key={shape.id}
+                      label={shape.label}
+                      checked={shape.id === props.shape}
+                      onClick={() => (close(), props.onShape(shape.id))}
+                    />
+                  ))}
+                  <MDivider />
+                  <MSection>Size</MSection>
+                  {SIZES.map((size) => (
+                    <MItem
+                      key={size.id}
+                      label={size.label}
+                      checked={size.id === props.size}
+                      onClick={() => (close(), props.onSize(size.id))}
+                    />
+                  ))}
+                </>
+              )}
+            </Menu>
+          )}
+          {props.change && (
+            <span {...changeTip.hover} className="is-tipwrap">
               <Menu
-                label="Shape and size"
-                value={`${SHAPES.find((s) => s.id === props.shape)!.label}, ${SIZES.find((s) => s.id === props.size)!.label.toLowerCase()}`}
-                icon={<Icon name="aspect-ratio-line" size={14} />}
+                label="Change size"
+                value={CHANGES.find((c) => c.id === props.change)!.label}
+                icon={<Icon name="contrast-drop-line" size={14} />}
                 short={short}
               >
-                {(close) => (
-                  <>
-                    <MSection>Shape</MSection>
-                    {SHAPES.map((shape) => (
-                      <MItem
-                        key={shape.id}
-                        label={shape.label}
-                        checked={shape.id === props.shape}
-                        onClick={() => (close(), props.onShape(shape.id))}
-                      />
-                    ))}
-                    <MDivider />
-                    <MSection>Size</MSection>
-                    {SIZES.map((size) => (
-                      <MItem
-                        key={size.id}
-                        label={size.label}
-                        checked={size.id === props.size}
-                        onClick={() => (close(), props.onSize(size.id))}
-                      />
-                    ))}
-                  </>
-                )}
+                {(close) =>
+                  CHANGES.map((change) => (
+                    <MItem
+                      key={change.id}
+                      label={change.label}
+                      checked={change.id === props.change}
+                      onClick={() => (close(), props.onChange(change.id))}
+                    />
+                  ))
+                }
               </Menu>
-            </>
+              {changeTip.tip}
+            </span>
           )}
-          <Menu
-            label="Style"
-            value={STYLES.find((s) => s.id === props.style)?.label ?? 'No style'}
-            icon={<Icon name="palette-line" size={14} />}
-            short={short}
-          >
-            {(close) => (
-              <>
-                <MItem label="No style" checked={props.style === null} onClick={() => (close(), props.onStyle(null))} />
-                <MDivider />
-                {STYLES.map((style) => (
+          {styled && (
+            <Menu
+              label="Style"
+              value={STYLES.find((s) => s.id === props.style)?.label ?? 'No style'}
+              icon={<Icon name="palette-line" size={14} />}
+              short={short}
+            >
+              {(close) => (
+                <>
                   <MItem
-                    key={style.id}
-                    label={style.label}
-                    checked={style.id === props.style}
-                    onClick={() => (close(), props.onStyle(style.id))}
+                    label="No style"
+                    checked={props.style === null}
+                    onClick={() => (close(), props.onStyle(null))}
                   />
-                ))}
-              </>
-            )}
-          </Menu>
-          {props.abilities.loras && !props.comparing && (
+                  <MDivider />
+                  {STYLES.map((style) => (
+                    <MItem
+                      key={style.id}
+                      label={style.label}
+                      checked={style.id === props.style}
+                      onClick={() => (close(), props.onStyle(style.id))}
+                    />
+                  ))}
+                </>
+              )}
+            </Menu>
+          )}
+          {props.abilities.loras && mode !== 'compare' && (
             <Loras adapters={props.adapters} on={props.loras} onChange={props.onLoras} short={short} />
           )}
-          {props.showCount && props.abilities.count > 1 && (
+          {(mode === 'make' || mode === 'change') && props.abilities.count > 1 && (
             <Menu
               label="Number of pictures"
               value={props.count === 1 ? '1 picture' : `${props.count} pictures`}
@@ -445,7 +603,7 @@ export function PromptBar(props: {
             />
             {more.tip}
           </span>
-          {props.comparing ? <span className="hs-composer-fill" /> : <ModelSlot />}
+          {mode === 'compare' ? <span className="hs-composer-fill" /> : <ModelSlot />}
           <span className="is-prompt-end">
             {props.onDescribe && (
               <span {...describe.hover} className="is-tipwrap">
@@ -458,7 +616,7 @@ export function PromptBar(props: {
                 {describe.tip}
               </span>
             )}
-            {props.onImprove && (
+            {props.onImprove && worded && (
               <span {...improve.hover} className="is-tipwrap">
                 <Tool
                   label="Improve my words"

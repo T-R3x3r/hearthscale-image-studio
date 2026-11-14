@@ -304,18 +304,124 @@ body {
   object-fit: contain;
 }
 
-.is-strokes[data-active='false'] {
+/* The marks over the picture: one canvas per colour, see-through so the
+   picture shows under them. */
+.is-marks {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  touch-action: none;
+  cursor: none;
+}
+
+.is-marks[data-tool='rectangle'] {
+  cursor: crosshair;
+}
+
+.is-marks-layers {
+  position: absolute;
+  inset: 0;
+  opacity: calc(var(--glassa) + 0.15);
   pointer-events: none;
 }
 
-.is-strokes {
+.is-marks-layer {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
-  opacity: var(--glassa);
-  cursor: crosshair;
-  touch-action: none;
+}
+
+/* The brush's size under the pointer: a light and a dark line, so it shows
+   on a light picture as on a dark one. */
+.is-mark-ring {
+  position: absolute;
+  top: 0;
+  left: 0;
+  box-sizing: border-box;
+  border: var(--bw) solid var(--glass-on-dark-ink);
+  border-radius: var(--r-round);
+  box-shadow:
+    0 0 0 var(--bw) var(--glass-on-dark),
+    inset 0 0 0 var(--bw) var(--glass-on-dark);
+  pointer-events: none;
+}
+
+.is-mark-ring[data-shown='false'],
+.is-mark-box[data-shown='false'] {
+  display: none;
+}
+
+.is-mark-box {
+  position: absolute;
+  background: var(--swatch);
+  opacity: calc(var(--glassa) + 0.15);
+  pointer-events: none;
+}
+
+/* The tools of the picture, in one row over it. */
+.is-markbar {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  gap: var(--gap-inline);
+  width: 100%;
+  max-width: var(--studio-column);
+  height: var(--h-ctl);
+  margin: 0 auto var(--gap-row);
+}
+
+.is-tools,
+.is-colours {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space);
+}
+
+.is-bar-divider {
+  flex: none;
+  width: var(--bw);
+  height: calc(var(--space) * 5);
+  margin: 0 var(--space);
+  background: var(--line);
+}
+
+/* A colour to mark in: its dot on a press as large as an icon button. */
+.is-colour,
+.is-colour-pick {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space);
+  height: var(--icon-ctl-md);
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-ctl);
+  background: none;
+  cursor: pointer;
+}
+
+.is-colour {
+  width: var(--icon-ctl-md);
+}
+
+.is-colour-pick {
+  padding: 0 var(--space) 0 calc(var(--space) * 2);
+  color: var(--mut);
+}
+
+.is-colour .hs-swatch-dot,
+.is-colour-pick .hs-swatch-dot {
+  width: calc(var(--space) * 3.5);
+  height: calc(var(--space) * 3.5);
+}
+
+.is-colour:focus-visible,
+.is-colour-pick:focus-visible {
+  outline: none;
+  box-shadow: var(--focus);
 }
 
 .is-making {
@@ -451,6 +557,14 @@ body {
   cursor: default;
 }
 
+/* One area of a run of marked areas: its colour's tint, filled with the
+   colour while the model works on it. */
+.is-step {
+  width: calc(var(--space) * 9);
+  height: calc(var(--space) * 9);
+  border-radius: var(--r-card);
+}
+
 /* The prompt */
 
 .is-dock {
@@ -509,6 +623,80 @@ body {
 
 .is-words::placeholder {
   color: var(--dim);
+}
+
+/* The marked areas in the prompt, one row each, where the text field is
+   for the whole picture. */
+.is-areas {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--space) * 0.5);
+  margin: calc(var(--space) * 2) calc(var(--space) * 2) 0 calc(var(--space) * 1.5);
+}
+
+.is-area {
+  display: flex;
+  align-items: center;
+  gap: var(--gap-inline);
+  min-height: var(--icon-ctl-md);
+  padding-right: var(--space);
+  border-radius: var(--r-ctl);
+}
+
+.is-area[data-current='true'] {
+  background: var(--hov);
+}
+
+.is-area-words {
+  flex: 1;
+  min-width: 0;
+  height: var(--h-ctl);
+  padding: 0 var(--space);
+  border: 0;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-size: var(--chat-size);
+  outline: none;
+}
+
+.is-area-words::placeholder {
+  color: var(--dim);
+}
+
+.is-area-picture {
+  position: relative;
+  flex: none;
+  width: calc(var(--space) * 7);
+  height: calc(var(--space) * 7);
+  overflow: hidden;
+  border: var(--bw) solid var(--line);
+  border-radius: var(--r-sm);
+}
+
+.is-area-picture .hs-shelf-remove {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: 0;
+  background: var(--scrim);
+  color: var(--scrim-ink);
+  opacity: 0;
+  transition: opacity var(--dur) var(--ease-out);
+}
+
+.is-area-picture:hover .hs-shelf-remove,
+.is-area-picture .hs-shelf-remove:focus-visible {
+  opacity: 1;
+}
+
+/* Changes of the whole picture that take one press, over the prompt. */
+.is-quick {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--gap-inline);
 }
 
 .is-advanced {

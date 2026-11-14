@@ -128,14 +128,11 @@ function PictureMenu(props: {
         label="Details"
         onClick={run(() => props.onDetails(picture))}
       />
-      {actions.edit && (
-        <MItem icon={<Icon name="image-edit-line" size={14} />} label="Edit this" onClick={run(actions.edit)} />
-      )}
       {actions.addToPrompt && (
         <MItem
           icon={<Icon name="image-add-line" size={14} />}
-          label="Add to the prompt"
-          onClick={run(actions.addToPrompt)}
+          label={actions.addToPrompt.label}
+          onClick={run(actions.addToPrompt.add)}
         />
       )}
       {actions.vary && (
@@ -158,11 +155,11 @@ function PictureMenu(props: {
       {actions.enlarge && (
         <MItem icon={<Icon name="zoom-in-line" size={14} />} label="Enlarge" onClick={run(actions.enlarge)} />
       )}
-      {actions.compareSource && (
+      {actions.beforeAfter && (
         <MItem
-          icon={<Icon name="contrast-2-line" size={14} />}
-          label="Compare with the original"
-          onClick={run(actions.compareSource)}
+          icon={<Icon name="split-cells-horizontal" size={14} />}
+          label="Before and after"
+          onClick={run(actions.beforeAfter)}
         />
       )}
       <MDivider />

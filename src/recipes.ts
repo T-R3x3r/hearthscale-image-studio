@@ -66,12 +66,53 @@ export const IDEAS = [
   'A friendly robot watering plants',
 ];
 
-/** The words an erase draws in place of what the brush covered. */
-export const ERASE_WORDS = 'the empty background behind it, seamless, nothing there';
+/** The words of a marked area the person left empty: what was there goes. */
+export const REMOVE_WORDS =
+  'Remove what is there. Fill the place with the background around it, seamless, as if nothing had ever been there.';
 
-/** The instruction that takes a picture's background away. */
-export const PLAIN_BACKGROUND_WORDS =
-  'Remove the background. Keep the main subject exactly as it is, on a plain white background.';
+/** The words of a marked area that holds pictures but no words of its own. */
+export const REFERENCE_WORDS = 'Put the subject of the added picture here, matching the light and the scene.';
+
+/** Changes of the whole picture that take one press, for a model that
+ *  follows reference pictures. */
+export const QUICK = [
+  {
+    id: 'text',
+    label: 'Remove all text',
+    icon: 't-box-line',
+    words:
+      'Remove all text from the picture: letters, numbers, captions, signs with writing, logos with words and watermarks. Fill each place with what would be behind it. Keep everything else exactly as it is.',
+  },
+  {
+    id: 'interface',
+    label: 'Remove the interface',
+    icon: 'gamepad-line',
+    words:
+      'Remove the game or app interface from the picture: menus, buttons, icons, health and status bars, maps, crosshairs, score and text overlays. Show only the scene behind them, filled in naturally. Keep everything else exactly as it is.',
+  },
+  {
+    id: 'night',
+    label: 'Make it night',
+    icon: 'moon-line',
+    words:
+      'Make it night: a dark sky, moonlight, and the lights of the scene switched on, with realistic shadows. Keep the scene, the people and the composition exactly as they are.',
+  },
+  {
+    id: 'background',
+    label: 'Remove the background',
+    icon: 'scissors-cut-line',
+    words: 'Remove the background. Keep the main subject exactly as it is, on a plain white background.',
+  },
+] as const;
+
+/** How far a change of the whole picture may move from it, for a model that
+ *  draws a picture again from a picture. */
+export const CHANGES = [
+  { id: 'small', label: 'Small change', strength: 0.4 },
+  { id: 'medium', label: 'Medium change', strength: 0.6 },
+  { id: 'big', label: 'Big change', strength: 0.8 },
+] as const;
+export type ChangeId = (typeof CHANGES)[number]['id'];
 
 /** How far "Vary a little" and "Vary a lot" move from a picture. */
 export const VARY = { little: 0.35, lot: 0.7 } as const;

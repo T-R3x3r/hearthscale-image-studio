@@ -46,7 +46,7 @@ export function pictureName(picture: Picture): string {
   return picture.prompt ? nameOf(picture.prompt) : 'Opened picture';
 }
 
-export type Action = 'make' | 'change' | 'edit' | 'fill' | 'erase' | 'extend' | 'enlarge' | 'open';
+export type Action = 'make' | 'change' | 'edit' | 'mark' | 'extend' | 'enlarge' | 'open';
 
 /** One picture of a run, as a file of the app's data folder. */
 export interface Picture {
@@ -179,13 +179,14 @@ export async function addRun(run: Run): Promise<void> {
 
 export async function updateRun(
   id: string,
-  fields: Partial<Pick<Run, 'status' | 'error' | 'started' | 'finished'>>,
+  fields: Partial<Pick<Run, 'status' | 'error' | 'started' | 'finished' | 'job' | 'inputs'>>,
 ): Promise<void> {
   const names = Object.keys(fields) as (keyof typeof fields)[];
   if (names.length === 0) return;
+  const value = (name: (typeof names)[number]) => (name === 'inputs' ? JSON.stringify(fields.inputs) : fields[name]);
   await call('hearthscale/db/exec', {
     sql: `UPDATE runs SET ${names.map((name) => `${name} = ?`).join(', ')} WHERE id = ?`,
-    params: [...names.map((name) => fields[name] ?? null), id],
+    params: [...names.map((name) => value(name) ?? null), id],
   });
 }
 
