@@ -39,12 +39,29 @@ body {
   color: var(--dim);
 }
 
-.is-prompt-end {
+/* The footer's end: the model slot takes the free room, then the tools of
+   the words and the main action. In one line the slot and the action are
+   parts of the row; in two, they share the second line. */
+.is-prompt-go {
+  display: contents;
+}
+
+.is-prompt-go > .is-model-slot,
+.is-prompt-go > .hs-composer-fill {
+  order: 1;
+}
+
+.is-prompt-tools {
   flex: none;
   display: flex;
+  order: 2;
   align-items: center;
   gap: var(--space);
-  margin-left: auto;
+}
+
+.is-prompt-action {
+  flex: none;
+  order: 3;
 }
 
 /* The model slot: the footer's free room, as high as the footer's other
@@ -62,24 +79,23 @@ body {
 }
 
 /* A row too narrow even for the pickers' icons takes a second line: the
-   tools of the words stay with the pickers, and the model slot and the main
-   action share the second line. */
+   tools of the words stay with the pickers, at the line's end, and the
+   model slot and the main action take the whole second line. */
 .is-prompt-row[data-wrap='true'] {
   flex-wrap: wrap;
   row-gap: var(--space);
 }
 
-.is-prompt-row[data-wrap='true'] .is-prompt-end {
-  display: contents;
-}
-
-.is-prompt-row[data-wrap='true'] .is-model-slot {
-  order: 1;
-}
-
-.is-prompt-row[data-wrap='true'] .is-prompt-action {
-  order: 2;
+.is-prompt-row[data-wrap='true'] .is-prompt-tools {
   margin-left: auto;
+}
+
+.is-prompt-row[data-wrap='true'] .is-prompt-go {
+  display: flex;
+  flex-basis: 100%;
+  order: 3;
+  align-items: center;
+  gap: var(--space);
 }
 
 .is-tool:disabled {
@@ -342,7 +358,7 @@ body {
 .is-marks-layers {
   position: absolute;
   inset: 0;
-  opacity: calc(var(--glassa) + 0.15);
+  opacity: var(--glassa);
   pointer-events: none;
 }
 
@@ -376,7 +392,7 @@ body {
 .is-mark-box {
   position: absolute;
   background: var(--swatch);
-  opacity: calc(var(--glassa) + 0.15);
+  opacity: var(--glassa);
   pointer-events: none;
 }
 
@@ -658,13 +674,12 @@ body {
   color: var(--dim);
 }
 
-/* The marked areas in the prompt, one row each, where the text field is
-   for the whole picture. */
+/* The marked areas in the prompt, one row each, in the composer's field
+   and its type, where the text field is for the whole picture. */
 .is-areas {
   display: flex;
   flex-direction: column;
   gap: calc(var(--space) * 0.5);
-  margin: calc(var(--space) * 2) calc(var(--space) * 2) 0 calc(var(--space) * 1.5);
 }
 
 .is-area {
@@ -680,16 +695,19 @@ body {
   background: var(--hov);
 }
 
-.is-area-words {
+.is-area-field {
   flex: 1;
   min-width: 0;
+}
+
+.is-area-words {
+  width: 100%;
   height: var(--h-ctl);
   padding: 0 var(--space);
   border: 0;
   background: none;
-  color: var(--text);
+  color: inherit;
   font: inherit;
-  font-size: var(--chat-size);
   outline: none;
 }
 

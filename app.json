@@ -107,7 +107,7 @@
             "type": "array",
             "items": { "type": "string", "pattern": "^pictures/([a-z0-9-]+/)?[^/\\\\:*?\"<>|]+\\.png$" },
             "minItems": 1,
-            "maxItems": 11
+            "maxItems": 13
           }
         },
         "required": ["paths"]

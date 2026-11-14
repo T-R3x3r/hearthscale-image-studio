@@ -1,13 +1,4 @@
-import {
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-  useSyncExternalStore,
-  type RefObject,
-} from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import type { ChatMessage, ModelCard } from '@hearthscale/app';
 import {
   Button,
@@ -72,11 +63,22 @@ import {
   areaPrompt,
   dimensions,
   withStyle,
+  type AreaAsk,
   type ChangeId,
   type ShapeId,
   type SizeId,
 } from './recipes';
-import { AREA_REFERENCES, Marks, blendInto, blendOf, markerName, maskOf, maskPng, paintedWith } from './marks';
+import {
+  AREA_REFERENCES,
+  Marks,
+  blendInto,
+  blendOf,
+  markerName,
+  maskOf,
+  maskPng,
+  paintedWith,
+  type Area,
+} from './marks';
 import { LONGEST, shortName, stamp } from './names';
 import { cancelRun, newId, onEnded, recoverRuns, runSteps, startRun, useLive } from './runs';
 import { Library, type LibraryActions } from './Library';
@@ -124,16 +126,16 @@ const PREFS: Prefs = {
   change: 'medium',
 };
 
-const LABELS: Record<Action | 'compare', string> = {
+/** The actions one job of the backend runs, by the words of their calls. */
+const LABELS = {
   make: 'Make',
   change: 'Change',
   edit: 'Change',
-  mark: 'Change',
   extend: 'Extend',
   enlarge: 'Enlarge',
-  open: 'Open',
   compare: 'Compare',
-};
+} as const;
+type JobAction = Exclude<keyof typeof LABELS, 'compare'>;
 
 /** What did not happen when an action failed, in one sentence. */
 const UNDONE: Record<Action | 'compare', string> = {
@@ -165,7 +167,9 @@ const DESCRIBE =
 /** The most pictures the prompt adds to the picture it changes. */
 const PROMPT_REFERENCES = 9;
 
-function newRun(fields: Partial<Run> & Pick<Run, 'kind' | 'action' | 'model' | 'label'>): Run {
+function newRun<A extends Action>(
+  fields: Partial<Run> & Pick<Run, 'kind' | 'model' | 'label'> & { action: A },
+): Run & { action: A } {
   return {
     id: newId(),
     made: Date.now(),
@@ -263,24 +267,6 @@ async function complete(content: ChatMessage['content'], system: string | null):
 /** The widths below which the library lies over the stage, and the bars keep only their main actions. */
 const CRAMPED = '(width < 900px)';
 const NARROW = '(width < 640px)';
-/** The main area's width, in CSS pixels, under which the tool row puts its
- *  colours, sides and sliders behind presses: the widest row, the brush
- *  with both sliders, then still fits beside the stage's inset. */
-const ROOMY = 1040;
-
-/** An element's width in CSS pixels, read again whenever it resizes. */
-function useWidth(element: RefObject<HTMLElement | null>) {
-  const [width, setWidth] = useState(0);
-  useLayoutEffect(() => {
-    const node = element.current!;
-    const read = () => setWidth(node.clientWidth);
-    read();
-    const observer = new ResizeObserver(read);
-    observer.observe(node);
-    return () => observer.disconnect();
-  }, [element]);
-  return width;
-}
 
 /** Whether the view is narrower than a media query's width, read again
  *  whenever the frame resizes, also while the view first renders. */
@@ -296,11 +282,27 @@ function useWidthBelow(query: string) {
   return useSyncExternalStore(subscribe, () => matchMedia(query).matches);
 }
 
-/** One area of a run of marked areas, as the run took it. */
-interface Planned {
+/** What a marked area asks for, as far as the model takes it: its pictures
+ *  only where the model reads reference pictures. */
+interface Wish extends AreaAsk {
   swatch: Swatch;
-  words: string;
   references: Picture[];
+}
+
+function wishOf(area: Area, edit: boolean): Wish {
+  const words = area.words.trim();
+  const references = edit ? area.references : [];
+  return {
+    swatch: area.swatch,
+    words,
+    references,
+    pictures: references.length,
+    removing: !words && references.length === 0,
+  };
+}
+
+/** One area of a run of marked areas, as the run took it. */
+interface Planned extends Wish {
   mask: Uint8Array;
 }
 
@@ -322,8 +324,6 @@ export function Studio() {
   const [page, setPage] = useState<Page>('studio');
   const cramped = useWidthBelow(CRAMPED);
   const narrow = useWidthBelow(NARROW);
-  const main = useRef<HTMLElement>(null);
-  const mainWidth = useWidth(main);
   const [folded, setFolded] = useState(cramped);
   const [pictures, setPictures] = useState<Picture[]>([]);
   const [search, setSearch] = useState('');
@@ -362,8 +362,8 @@ export function Studio() {
   const stripRunRef = useRef<Run | null>(null);
   /** What starts each run again, by the run's id. */
   const agains = useRef(new Map<string, () => Promise<unknown>>());
-  /** The areas of each run of marked areas, by the run's id. */
-  const plans = useRef(new Map<string, { swatch: Swatch; removing: boolean }[]>());
+  /** The areas of each run of marked areas while it runs, by the run's id. */
+  const plans = useRef(new Map<string, Wish[]>());
   const compareSetRef = useRef<string | null>(null);
   const places = useRef<{ back: Place[]; forward: Place[] }>({ back: [], forward: [] });
   const here = useRef<Place>({ section: 'all', picture: null });
@@ -450,6 +450,7 @@ export function Studio() {
   useEffect(
     () =>
       onEnded(async (id, outcome, error) => {
+        plans.current.delete(id);
         await refreshLibrary();
         const run = stripRunRef.current;
         if (id === run?.id) {
@@ -579,8 +580,9 @@ export function Studio() {
       : null;
   const target = page === 'studio' ? shown : null;
   const changing = !!target && !!stageLive;
-  const markable = !!target && abilities.fill && !!shownSize && marks.width === shownSize.width;
+  const markable = !!target && abilities.mask && !!shownSize && marks.width === shownSize.width;
   const areas = markable ? marks.areas : [];
+  const wishes = areas.map((area) => wishOf(area, abilities.edit));
   const canChange = abilities.edit || abilities.change;
 
   let mode: PromptMode;
@@ -592,7 +594,7 @@ export function Studio() {
 
   const words = mode === 'make' || mode === 'compare' ? makeWords : changeWords;
   const setWords = mode === 'make' || mode === 'compare' ? setMakeWords : setChangeWords;
-  const removing = areas.every((area) => !area.words.trim() && area.references.length === 0);
+  const removing = wishes.every((wish) => wish.removing);
   const anySide = sides.left || sides.right || sides.top || sides.bottom;
   const comparable = prefs.compare.filter((id) => imageCards.some((c) => c.id === id)).length >= 2;
 
@@ -667,7 +669,7 @@ export function Studio() {
 
   /** `again` restarts the run if it fails. */
   async function begin(
-    run: Run,
+    run: Run & { action: JobAction },
     input: Record<string, unknown>,
     again: () => Promise<unknown>,
     loras: Lora[],
@@ -675,7 +677,7 @@ export function Studio() {
   ) {
     const card = imageCards.find((c) => c.id === run.model);
     const used = card ? fitting(card, loras, models?.adapters ?? []) : [];
-    const started: Run = { ...run, loras: lorasOf(used) };
+    const started = { ...run, loras: lorasOf(used) };
     if (started.action === 'enlarge') {
       setProblem(null);
       agains.current.set(started.id, again);
@@ -697,18 +699,8 @@ export function Studio() {
       if (mode === 'compare') await compare();
       else if (mode === 'make') await make();
       else if (mode === 'areas') {
-        const from = shown!;
-        const size = shownSize!;
-        const plan: Planned[] = areas.map((area) => ({
-          swatch: area.swatch,
-          words: area.words.trim(),
-          references: area.references,
-          mask: maskOf(area),
-        }));
-        const soft = softEdge;
-        const loras = prefs.loras;
-        marks.reset(size.width, size.height);
-        await changeAreas(from, size, plan, soft, loras);
+        const plan: Planned[] = areas.map((area, index) => ({ ...wishes[index], mask: maskOf(area) }));
+        await changeAreas(shown!, shownSize!, plan, softEdge * marks.scale, prefs.loras);
       } else if (mode === 'extend') {
         const from = shown!;
         const margins = marginsOf(shownSize!, sides, sides.share);
@@ -845,7 +837,8 @@ export function Studio() {
   /** Changes each marked area in turn, each on the picture the one before
    *  left: the model draws the area's mask anew from its words, or takes
    *  away what is there where it has none, and only the pixels of the area
-   *  take the new picture, blended over `soft` pixels at its edge. */
+   *  take the new picture, blended over `soft` pixels of the picture at its
+   *  edge. It answers once the run has started; the run goes on by itself. */
   async function changeAreas(
     from: Picture,
     size: { width: number; height: number },
@@ -874,25 +867,23 @@ export function Studio() {
       source: from.id,
       loras: lorasOf(used),
     });
-    plans.current.set(
-      run.id,
-      plan.map((area) => ({ swatch: area.swatch, removing: !area.words && area.references.length === 0 })),
-    );
-    showRun(run, () => changeAreas(from, size, plan, soft, loras), from);
-    await runSteps(run, plan.length, async (steps) => {
-      const [first] = await hold([from.path]);
-      await steps.hold(first);
-      let current = first;
+    plans.current.set(run.id, plan);
+    const again = () => changeAreas(from, size, plan, soft, loras);
+    showRun(run, again, from);
+    void runSteps(run, async (steps) => {
+      const held = await hold([from.path, ...plan.flatMap((area) => area.references.map((p) => p.path))]);
+      await steps.hold(...held);
+      let current = held[0];
+      let next = 1;
       const pixels = await pixelsOf(await blobOf(from.path), width, height);
       for (const [index, area] of plan.entries()) {
         const mask = await upload('mask.png', await maskPng(area.mask, width, height));
         await steps.hold(mask);
-        const extra = area.references.length ? await hold(area.references.map((p) => p.path)) : [];
-        await steps.hold(...extra);
-        const removing = !area.words && area.references.length === 0;
-        const prompt = areaPrompt(area.words, area.references.length, able.edit, markerName(area.swatch).toLowerCase());
+        const extra = held.slice(next, next + area.references.length);
+        next += area.references.length;
+        const prompt = areaPrompt(area, able.edit, markerName(area.swatch).toLowerCase());
         let reference = current;
-        if (able.edit && !removing) {
+        if (able.edit && !area.removing) {
           reference = await upload('marked.png', await pngOf(paintedWith(pixels, area.mask, area.swatch)));
           await steps.hold(reference);
         }
@@ -911,7 +902,7 @@ export function Studio() {
         const job = await steps.job(index, card.id, input);
         const outputs = (job.outputs ?? []).flatMap((output) => (output.asset ? [output.asset] : []));
         await steps.hold(...outputs);
-        if (!outputs[0]) throw new Error('The model gave back no picture.');
+        if (!outputs[0]) throw new Error('No picture came back.');
         const answer = await fetch(assetUrl(outputs[0]));
         if (!answer.ok) throw new Error(await answer.text());
         const result = await pixelsOf(await answer.blob(), width, height);
@@ -922,7 +913,7 @@ export function Studio() {
       }
       await steps.handOver(current);
       return (await tool<{ path: string }>('keep', { asset: current, run: run.id }, 'Change')).path;
-    });
+    }).catch(failed(UNDONE.mark, again));
   }
 
   async function compare() {
@@ -971,6 +962,7 @@ export function Studio() {
     );
     const next = newRun({
       ...run,
+      action: 'make',
       id: newId(),
       made: Date.now(),
       model: card.id,
@@ -1357,7 +1349,7 @@ export function Studio() {
   const suggestedImage = models?.downloading.find((card) => card.kind === 'image') ?? models?.absentImage[0] ?? null;
   const plan = stripRun ? plans.current.get(stripRun.id) : undefined;
   const step = stripLive?.step ?? null;
-  const area = plan && step ? plan[step.index] : null;
+  const area = plan && step !== null ? plan[step] : null;
   const liveLabel = !stripRun
     ? ''
     : area
@@ -1369,9 +1361,12 @@ export function Studio() {
           : stripRun.action === 'extend'
             ? 'Extending…'
             : 'Changing…';
+  const pickSwatch = (next: Swatch) => {
+    setSwatch(next);
+    if (currentTool === 'eraser') setTool('brush');
+  };
   const stageProps: StageProps = {
     narrow,
-    compact: mainWidth < ROOMY,
     picture: page === 'studio' ? shown : null,
     size: shownSize,
     comparing,
@@ -1400,10 +1395,7 @@ export function Studio() {
     onTool: setTool,
     marks,
     swatch,
-    onSwatch: (next) => {
-      setSwatch(next);
-      if (currentTool === 'eraser') setTool('brush');
-    },
+    onSwatch: pickSwatch,
     brushSize,
     onBrushSize: setBrushSize,
     softEdge,
@@ -1529,7 +1521,7 @@ export function Studio() {
           />
         </aside>
       )}
-      <main className="is-main" ref={main}>
+      <main className="is-main">
         <div className="is-toolbar">
           <span {...fold.hover} className="is-tipwrap">
             <IconButton
@@ -1566,18 +1558,18 @@ export function Studio() {
                     <img src={fileUrl(picture.path)} alt={pictureName(picture)} />
                   </button>
                 ))}
-                {stripLive && plan && step
+                {stripLive && plan && step !== null
                   ? plan.map((each, index) => (
                       <div
                         key={each.swatch}
                         className="is-strip-item is-step hs-tinted"
                         data-making
                         data-swatch={each.swatch}
-                        data-selected={index === step.index ? 'true' : undefined}
+                        data-selected={index === step ? 'true' : undefined}
                       >
-                        {index < step.index ? (
+                        {index < step ? (
                           <Icon name="check-line" size={16} />
-                        ) : index === step.index ? (
+                        ) : index === step ? (
                           <Meter value={stripLive.fraction} label={`${markerName(each.swatch)} area`} variant="ring" />
                         ) : (
                           <span className="hs-swatch-dot" />
@@ -1661,10 +1653,7 @@ export function Studio() {
             canAddReference={abilities.edit && references.length < PROMPT_REFERENCES}
             areas={areas}
             swatch={swatch}
-            onSwatch={(next) => {
-              setSwatch(next);
-              if (currentTool === 'eraser') setTool('brush');
-            }}
+            onSwatch={pickSwatch}
             onAreaWords={(each, text) => marks.setWords(each, text)}
             onAreaFile={(each, file) => void openFile(file, each)}
             onDropAreaReference={(each, id) => marks.dropReference(each, id)}

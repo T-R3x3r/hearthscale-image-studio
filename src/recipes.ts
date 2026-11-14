@@ -66,20 +66,34 @@ export const IDEAS = [
   'A friendly robot watering plants',
 ];
 
-/** The words of a marked area the person left empty: what was there goes. */
-export const REMOVE_WORDS =
+/** What an edit model is told for an area to remove: it reads the picture
+ *  and these words, so they name what goes. */
+const REMOVE_WORDS =
   'Remove every object, person, text and interface element in front of the scene, and show the background behind them, seamless, as if nothing had ever been there.';
 
-/** The prompt of one marked area's job. An area with no words and no
- *  pictures is removed. A model that follows reference pictures sees the
- *  area filled in its colour in picture 1, and the area's pictures after
- *  it, so it is told to replace the area of that colour; any other model
- *  reads the words as what the area shows. */
-export function areaPrompt(words: string, pictures: number, edit: boolean, colour: string): string {
-  if (!words && pictures === 0) return REMOVE_WORDS;
-  if (!edit) return words;
-  const what = words || 'the subject of the added picture';
-  const from = pictures === 0 ? '' : pictures === 1 ? ' from picture 2' : ` from pictures 2 to ${pictures + 1}`;
+/** What any other model draws in an area to remove: it reads the words as
+ *  what the area shows. */
+const ERASE_WORDS = 'the empty background behind it, seamless, nothing there';
+
+/** What a marked area asks of its job. */
+export interface AreaAsk {
+  words: string;
+  /** The area's pictures the model reads, after the picture itself. */
+  pictures: number;
+  /** Whether the area has neither words nor pictures, so what is there goes. */
+  removing: boolean;
+}
+
+/** The prompt of one marked area's job. A model that follows reference
+ *  pictures sees an area to change filled in its colour in picture 1, and
+ *  the area's pictures after it, so it is told to replace the area of that
+ *  colour; any other model reads the words as what the area shows. */
+export function areaPrompt(ask: AreaAsk, edit: boolean, colour: string): string {
+  if (ask.removing) return edit ? REMOVE_WORDS : ERASE_WORDS;
+  if (!edit) return ask.words;
+  const what = ask.words || 'the subject of the added picture';
+  const from =
+    ask.pictures === 0 ? '' : ask.pictures === 1 ? ' from picture 2' : ` from pictures 2 to ${ask.pictures + 1}`;
   return `Replace the ${colour} area with ${what}${from}, matching the light and the scene around it.`;
 }
 

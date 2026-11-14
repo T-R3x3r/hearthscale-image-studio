@@ -12,8 +12,8 @@ export interface Live {
   waiting: string | null;
   started: number | null;
   job: string | null;
-  /** The step a run of several jobs is on, from 0, and how many it has. */
-  step: { index: number; count: number } | null;
+  /** The step a run of several jobs is on, from 0. */
+  step: number | null;
 }
 
 type Ended = (run: string, outcome: 'done' | 'failed' | 'cancelled', error?: string) => void;
@@ -170,11 +170,16 @@ const cancelling = new Set<string>();
 export async function cancelRun(run: string): Promise<void> {
   cancelling.add(run);
   const job = live.get(run)?.job;
-  if (job) await call('hearthscale/jobs/cancel', { id: job });
+  if (!job) return;
+  try {
+    await call('hearthscale/jobs/cancel', { id: job });
+  } catch {
+    // The job had ended: a run of several jobs stops before its next step.
+  }
 }
 
 /** What a run of several jobs does with each step. */
-export interface Steps {
+interface Steps {
   /** Runs one image job of the view and answers its record once it
    *  completed. It throws when the job failed or was cancelled. */
   job(index: number, model: string, input: Record<string, unknown>): Promise<Job>;
@@ -186,16 +191,22 @@ export interface Steps {
   handOver(asset: string): Promise<void>;
 }
 
-async function stepJob(
-  run: Run,
-  index: number,
-  count: number,
-  model: string,
-  input: Record<string, unknown>,
-): Promise<Job> {
+/** The store key under which a run of several jobs keeps the time it last
+ *  moved, so another view can tell a run in progress from one left behind. */
+const drivenKey = (run: string) => `driven:${run}`;
+
+/** How long after its last move a run of several jobs counts as driven. */
+const DRIVEN_MS = 60_000;
+
+async function moved(run: Run) {
+  await call('hearthscale/store/set', { key: drivenKey(run.id), value: Date.now() });
+}
+
+async function stepJob(run: Run, index: number, model: string, input: Record<string, unknown>): Promise<Job> {
   if (cancelling.has(run.id)) throw new Cancelled();
   const { job } = await call('hearthscale/jobs/submit', { kind: 'image', model, input });
   await updateRun(run.id, { job: job.id });
+  await moved(run);
   if (cancelling.has(run.id)) await call('hearthscale/jobs/cancel', { id: job.id });
   return new Promise<Job>((resolve, reject) => {
     const follow = (now: Job) => {
@@ -217,7 +228,7 @@ async function stepJob(
         preview: now.progress?.preview ?? before.preview,
         waiting: now.waiting ?? null,
         job: now.id,
-        step: { index, count },
+        step: index,
       }).then((next) => {
         if (!settled.has(run.id) && steps.has(now.id)) {
           live.set(run.id, next);
@@ -234,8 +245,7 @@ async function stepJob(
 /** Starts a run of several image jobs the view submits one after another.
  *  `work` runs them and answers the path of the run's picture in the data
  *  folder; the run fails with its error, or ends cancelled. */
-export async function runSteps(run: Run, count: number, work: (steps: Steps) => Promise<string>): Promise<void> {
-  await addRun(run);
+export async function runSteps(run: Run, work: (steps: Steps) => Promise<string>): Promise<void> {
   runs.set(run.id, run);
   live.set(run.id, {
     status: 'queued',
@@ -245,11 +255,11 @@ export async function runSteps(run: Run, count: number, work: (steps: Steps) => 
     waiting: null,
     started: null,
     job: null,
-    step: { index: 0, count },
+    step: 0,
   });
   changed();
   const own: Steps = {
-    job: (index, model, input) => stepJob(run, index, count, model, input),
+    job: (index, model, input) => stepJob(run, index, model, input),
     preview: (asset) => {
       const now = live.get(run.id);
       if (!now || settled.has(run.id)) return;
@@ -259,13 +269,17 @@ export async function runSteps(run: Run, count: number, work: (steps: Steps) => 
     hold: async (...assets) => {
       run.inputs.push(...assets);
       await updateRun(run.id, { inputs: run.inputs });
+      await moved(run);
     },
     handOver: async (asset) => {
+      if (cancelling.has(run.id)) throw new Cancelled();
       run.inputs = run.inputs.filter((held) => held !== asset);
       await updateRun(run.id, { inputs: run.inputs });
     },
   };
   try {
+    await addRun(run);
+    await moved(run);
     const path = await work(own);
     await complete(run, [{ path, seed: null }]);
   } catch (error) {
@@ -273,6 +287,7 @@ export async function runSteps(run: Run, count: number, work: (steps: Steps) => 
     else await fail(run, 'failed', reason(error));
   } finally {
     cancelling.delete(run.id);
+    await call('hearthscale/store/delete', { key: drivenKey(run.id) });
   }
 }
 
@@ -317,20 +332,23 @@ export async function recoverRuns(): Promise<void> {
   }
 }
 
-/** A run of several jobs goes on only in the view that drives it: while
- *  its job still runs, another view leaves it alone, and once no view
- *  drives it, it fails. */
+/** A run of several jobs goes on only in the view that drives it. Another
+ *  view leaves it alone while its job runs, and between two jobs while it
+ *  moved less than DRIVEN_MS ago; a run no view drives fails. */
 async function recoverSteps(run: Run) {
   if (run.job) {
     try {
       const { job } = await call('hearthscale/jobs/get', { id: run.job });
       if (job.status === 'queued' || job.status === 'running') return;
     } catch {
-      // Hearthscale no longer knows the job: no view drives the run.
+      // Hearthscale no longer knows the job: its last move tells.
     }
   }
+  const { value } = await call('hearthscale/store/get', { key: drivenKey(run.id) });
+  if (typeof value === 'number' && Date.now() - value < DRIVEN_MS) return;
   runs.set(run.id, run);
-  await fail(run, 'failed', 'The picture closed before the change was done. Change it again.');
+  await fail(run, 'failed', 'The window closed before the change was done. Change the picture again.');
+  await call('hearthscale/store/delete', { key: drivenKey(run.id) });
 }
 
 /** A new id for a run, safe as a folder name. */

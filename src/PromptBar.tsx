@@ -23,6 +23,7 @@ import type { Abilities, Lora } from './models';
 import type { ModelCard } from '@hearthscale/app';
 import { CHANGES, SHAPES, SIZES, STYLES, type ChangeId, type ShapeId, type SizeId } from './recipes';
 import { AREA_REFERENCES, markerName, type Area } from './marks';
+import { explained } from './explained';
 
 export interface Advanced {
   negative: string;
@@ -147,8 +148,8 @@ function ModelSlot() {
  *  fit, so the pickers show their icons alone; `wrap` while even the icons
  *  do not, so the footer takes a second line. Each picker's whole name is
  *  counted, so the result holds while names are hidden, and every part is
- *  counted on one line, each of the end's parts on its own, so it holds
- *  while the footer wraps. */
+ *  counted on one line, the second line's model and main action each on
+ *  its own, so it holds while the footer wraps. */
 function useShortRow(row: RefObject<HTMLDivElement | null>): { short: boolean; wrap: boolean } {
   const [fit, setFit] = useState({ short: false, wrap: false });
   const measure = () => {
@@ -157,7 +158,7 @@ function useShortRow(row: RefObject<HTMLDivElement | null>): { short: boolean; w
     const room = el.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
     const nameGap = parseFloat(style.getPropertyValue('--gap-inline')) || 0;
     const parts = [...el.children]
-      .flatMap((part) => (getComputedStyle(part).display === 'contents' ? [...part.children] : [part]))
+      .flatMap((part) => (part.classList.contains('is-prompt-go') ? [...part.children] : [part]))
       .filter((part) => getComputedStyle(part).display !== 'none');
     let need = parseFloat(style.columnGap) * (parts.length - 1);
     let names = 0;
@@ -274,6 +275,7 @@ function AreaRow(props: {
   const pick = tips('pick', `Mark in ${name}`);
   const add = tips('add', `Add a picture of what goes in the ${name} area`);
   const drop = tips('drop', `Delete the ${name} marks`);
+  const empty = tips('empty', area.words ? undefined : 'Leave empty to remove what is marked');
   return (
     <div className="is-area" data-swatch={area.swatch} data-current={props.current}>
       <span {...pick.hover} className="is-tipwrap">
@@ -288,32 +290,36 @@ function AreaRow(props: {
         </button>
         {pick.tip}
       </span>
-      <input
-        className="is-area-words"
-        value={area.words}
-        placeholder={area.references.length ? 'What the added picture shows' : 'Remove what is marked'}
-        aria-label={`${markerName(area.swatch)} area`}
-        onFocus={props.onSwatch}
-        onChange={(e) => props.onWords(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
-            e.preventDefault();
-            props.onSubmit();
-          }
-        }}
-      />
-      {area.references.map((picture) => (
-        <div key={picture.id} className="is-area-picture">
-          <img className="is-shelf-picture" src={fileUrl(picture.path)} alt={pictureName(picture)} />
-          <button
-            className="hs-shelf-remove"
-            aria-label={`Remove from the ${name} area`}
-            onClick={() => props.onDropReference(picture.id)}
-          >
-            <Icon name="close-line" size={12} />
-          </button>
-        </div>
-      ))}
+      <span {...empty.hover} className="is-tipwrap is-area-field">
+        <input
+          className="is-area-words"
+          value={area.words}
+          placeholder="A wooden bench"
+          aria-label={`${markerName(area.swatch)} area`}
+          onFocus={props.onSwatch}
+          onChange={(e) => props.onWords(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
+              e.preventDefault();
+              props.onSubmit();
+            }
+          }}
+        />
+        {empty.tip}
+      </span>
+      {props.references &&
+        area.references.map((picture) => (
+          <div key={picture.id} className="is-area-picture">
+            <img className="is-shelf-picture" src={fileUrl(picture.path)} alt={pictureName(picture)} />
+            <button
+              className="hs-shelf-remove"
+              aria-label={`Remove from the ${name} area`}
+              onClick={() => props.onDropReference(picture.id)}
+            >
+              <Icon name="close-line" size={12} />
+            </button>
+          </div>
+        ))}
       {props.references && area.references.length < AREA_REFERENCES && (
         <span {...add.hover} className="is-tipwrap">
           <IconButton size="sm" aria-label={`Add a picture to the ${name} area`} onClick={() => file.current?.click()}>
@@ -407,16 +413,6 @@ export function PromptBar(props: {
   const { negative, steps, guidance, seed } = props.abilities;
   const settable = negative || steps || guidance || seed;
   const more = tips('advanced', settable ? 'More settings' : 'This model takes no more settings');
-  /** A control with a tooltip that explains the app's word on it. */
-  const explained = (key: string, text: string, control: ReactNode) => {
-    const t = tips(key, text);
-    return (
-      <span {...t.hover} className="is-tipwrap">
-        {control}
-        {t.tip}
-      </span>
-    );
-  };
   const chips =
     mode === 'change' && props.target && props.references.length > 0 ? [props.target, ...props.references] : [];
   const worded = mode === 'make' || mode === 'change' || mode === 'extend' || mode === 'compare';
@@ -447,7 +443,7 @@ export function PromptBar(props: {
           </div>
         )}
         {mode === 'areas' ? (
-          <div className="is-areas">
+          <div className="hs-composer-field is-areas">
             {props.areas.map((area) => (
               <AreaRow
                 key={area.swatch}
@@ -543,7 +539,7 @@ export function PromptBar(props: {
           {props.change && (
             <span {...changeTip.hover} className="is-tipwrap">
               <Menu
-                label="Change size"
+                label="Amount of change"
                 value={CHANGES.find((c) => c.id === props.change)!.label}
                 icon={<Icon name="contrast-drop-line" size={14} />}
                 short={short}
@@ -622,31 +618,35 @@ export function PromptBar(props: {
             />
             {more.tip}
           </span>
-          {mode === 'compare' ? <span className="hs-composer-fill" /> : <ModelSlot />}
-          <span className="is-prompt-end">
-            {props.onDescribe && (
-              <span {...describe.hover} className="is-tipwrap">
-                <Tool
-                  label="Describe this picture"
-                  icon="eye-line"
-                  disabled={props.helping}
-                  onClick={props.onDescribe}
-                />
-                {describe.tip}
-              </span>
-            )}
-            {props.onImprove && worded && (
-              <span {...improve.hover} className="is-tipwrap">
-                <Tool
-                  label="Improve my words"
-                  icon={props.helping ? 'loader-4-line' : 'quill-pen-line'}
-                  spin={props.helping}
-                  disabled={props.helping || !props.words.trim()}
-                  onClick={props.onImprove}
-                />
-                {improve.tip}
-              </span>
-            )}
+          {(props.onDescribe || (props.onImprove && worded)) && (
+            <span className="is-prompt-tools">
+              {props.onDescribe && (
+                <span {...describe.hover} className="is-tipwrap">
+                  <Tool
+                    label="Describe this picture"
+                    icon="eye-line"
+                    disabled={props.helping}
+                    onClick={props.onDescribe}
+                  />
+                  {describe.tip}
+                </span>
+              )}
+              {props.onImprove && worded && (
+                <span {...improve.hover} className="is-tipwrap">
+                  <Tool
+                    label="Improve my words"
+                    icon={props.helping ? 'loader-4-line' : 'quill-pen-line'}
+                    spin={props.helping}
+                    disabled={props.helping || !props.words.trim()}
+                    onClick={props.onImprove}
+                  />
+                  {improve.tip}
+                </span>
+              )}
+            </span>
+          )}
+          <span className="is-prompt-go">
+            {mode === 'compare' ? <span className="hs-composer-fill" /> : <ModelSlot />}
             <span {...off.hover} className="is-tipwrap is-prompt-action">
               <Button variant="primary" size="sm" disabled={!props.ready || props.busy} onClick={props.onSubmit}>
                 {props.action}
@@ -670,6 +670,7 @@ export function PromptBar(props: {
             )}
             {props.abilities.steps &&
               explained(
+                tips,
                 'steps',
                 'More detail takes longer',
                 <SliderField
@@ -683,6 +684,7 @@ export function PromptBar(props: {
               )}
             {props.abilities.guidance &&
               explained(
+                tips,
                 'guidance',
                 'How closely the picture follows your words',
                 <SliderField
@@ -698,6 +700,7 @@ export function PromptBar(props: {
               )}
             {props.abilities.seed &&
               explained(
+                tips,
                 'seed',
                 'The same number and the same words make the same picture again',
                 <TextField

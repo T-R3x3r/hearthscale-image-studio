@@ -67,6 +67,7 @@ see [Marked areas](#marked-areas).
 | Pictures                              | PNG files in the data folder, `pictures/2026-11-03 14.32 Red fox at dawn.png` |
 | Runs and pictures                     | The app's SQLite database, tables `runs` and `pictures` (`src/records.ts`) |
 | The person's choices                  | The store, key `prefs`                                                  |
+| When a run of marked areas last moved | The store, key `driven:<run id>`, while the run lasts                   |
 | Masks, uploads, pictures a job reads  | Assets of the app, released when the job ends                           |
 | Marks while the person paints         | One canvas per colour in the view (`src/marks.ts`), never stored        |
 
@@ -120,11 +121,16 @@ button names its result:
 A pixel belongs to one colour at most: painting in one colour takes the
 pixel from the others, the eraser takes it from every colour, and Invert
 gives a colour every pixel no colour holds. An area with words changes into
-them; an area with no words and no pictures is removed (`REMOVE_WORDS`).
+them; an area with no words and no pictures is removed (`wishOf` in
+`src/Studio.tsx` decides it once). An area's pictures count only for a model
+whose schema has `references`. Brush size and Soft edge are set in the
+screen's pixels, and the run takes the soft edge in the picture's.
 
 One press is one run of action `mark`, with one job per area, in the order
 the colours were first used (`changeAreas` in `src/Studio.tsx`, `runSteps` in
-`src/runs.ts`):
+`src/runs.ts`). The run goes on by itself, so the prompt stays free, and the
+marks stay until its picture shows, so a run that fails or is cancelled
+keeps them. Every picture of the areas is read when the run starts:
 
 1. The job takes the current picture as `image`, the area's marks as `mask`
    (white where it draws anew) and `strength` 1, with the prompt of
@@ -134,18 +140,22 @@ the colours were first used (`changeAreas` in `src/Studio.tsx`, `runSteps` in
    its marker's plain colour (`paintedWith`), and the prompt says to replace
    the area of that colour. For an area to remove, picture 1 is the picture
    as it is, and the prompt names what goes: objects, people, text and
-   interface parts in front of the scene.
+   interface parts in front of the scene. A model without `references`
+   reads the area's words as what it shows, and for an area to remove, the
+   words of an empty background.
 2. The view reads the job's picture and lays it into the current picture by
    the area's blend (`blendOf`): nothing outside the marks, all of it deeper
    inside the marks than the soft edge, and a smooth rise in between, from a
-   distance transform of the marks. The pixels are read and written exactly
-   (`pixelsOf`, `pngOf`), so a pixel outside the marks keeps its value.
+   distance transform of the marks, transparency included. The pixels are
+   read and written exactly (`pixelsOf`, `pngOf`), so a pixel outside the
+   marks keeps its value. A job's picture of another size fails the run.
 3. The result is uploaded and is the next job's `image`.
 
 The last picture goes to the run's folder through `keep`, and is named as
 every run's pictures are. The run's `job` holds the job of the area in
-progress. The view drives the run, so a run whose view closed fails when the
-view next opens, unless its job still runs.
+progress, and the store holds when the run last moved. The view drives the
+run, so a run whose view closed fails when a view next opens, unless its
+job still runs or it moved in the last minute.
 
 The schema states no size of its own, so a picture's size comes from the
 shape and the size the person picks (`src/recipes.ts`), multiples of 64.

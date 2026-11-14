@@ -12,7 +12,7 @@ export interface Abilities {
   /** Starts from a picture and moves away from it as far as `strength` says. */
   change: boolean;
   /** Draws a masked part of a picture anew. */
-  fill: boolean;
+  mask: boolean;
   /** Reads reference pictures, which a model made for editing follows. */
   edit: boolean;
   /** Takes a width and a height. */
@@ -40,7 +40,7 @@ export function abilitiesOf(card: ModelCard | undefined): Abilities {
   const props = input?.properties ?? {};
   return {
     change: 'image' in props,
-    fill: 'mask' in props,
+    mask: 'mask' in props,
     edit: 'references' in props,
     size: 'width' in props && 'height' in props,
     side: Math.sqrt((props.width?.default ?? SIDE) * (props.height?.default ?? SIDE)),

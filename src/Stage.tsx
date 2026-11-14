@@ -35,6 +35,7 @@ import type { Margins } from './pictures';
 import { MARKERS, markerName, type Marks, type Point } from './marks';
 import { ProblemNotice } from './Problem';
 import { Details } from './Details';
+import { explained } from './explained';
 
 /** What a press on the picture does: paint a colour, draw a box of it,
  *  erase marks, or grow the picture past its edges. */
@@ -97,6 +98,7 @@ function useFit(area: RefObject<HTMLElement | null>, width: number, height: numb
  *  size, and the press that paints, erases or draws a box. */
 function MarkLayer(props: { marks: Marks; tool: Tool; swatch: Swatch; brushSize: number }) {
   const { marks } = props;
+  const root = useRef<HTMLDivElement>(null);
   const layer = useRef<HTMLDivElement>(null);
   const ring = useRef<HTMLDivElement>(null);
   const box = useRef<HTMLDivElement>(null);
@@ -106,6 +108,17 @@ function MarkLayer(props: { marks: Marks; tool: Tool; swatch: Swatch; brushSize:
   useLayoutEffect(() => {
     layer.current!.replaceChildren(...marks.areas.map((area) => area.canvas));
   }, [marks, version]);
+
+  useLayoutEffect(() => {
+    const element = root.current!;
+    const read = () => {
+      if (element.clientWidth > 0) marks.scale = marks.width / element.clientWidth;
+    };
+    read();
+    const observer = new ResizeObserver(read);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [marks]);
 
   useEffect(() => {
     const later = () => requestAnimationFrame(() => marks.recolor());
@@ -159,6 +172,7 @@ function MarkLayer(props: { marks: Marks; tool: Tool; swatch: Swatch; brushSize:
 
   return (
     <div
+      ref={root}
       className="is-marks"
       data-tool={props.tool}
       onPointerDown={(event) => {
@@ -229,10 +243,12 @@ interface BarSliderSpec {
 }
 
 /** Sliders of the bar: each beside its label, or in a compact bar behind
- *  one press of the first one's label, which opens them all, each under
- *  its label. */
-function BarSlider(props: { compact: boolean; sliders: BarSliderSpec[] }) {
+ *  one press that opens them all, each under its label. The press shows
+ *  the one slider's label, or, for several, `icon`, and its name and
+ *  tooltip name them all. */
+function BarSlider(props: { compact: boolean; sliders: BarSliderSpec[]; icon?: IconName }) {
   const [at, setAt] = useState<HTMLElement | null>(null);
+  const tips = useFloatingTips('bottom');
   const slider = (spec: BarSliderSpec) => (
     <Slider
       label={spec.label}
@@ -256,17 +272,28 @@ function BarSlider(props: { compact: boolean; sliders: BarSliderSpec[] }) {
       </>
     );
   }
-  const title = props.sliders[0].label;
+  const title = props.sliders.map((spec, i) => (i === 0 ? spec.label : spec.label.toLowerCase())).join(' and ');
   return (
     <>
-      <Button
-        variant="ghost"
-        size="sm"
-        trailingIcon={<Icon name="arrow-down-s-line" size={14} />}
-        onClick={(e) => setAt(e.currentTarget)}
-      >
-        {title}
-      </Button>
+      {props.icon && props.sliders.length > 1 ? (
+        explained(
+          tips,
+          'sliders',
+          title,
+          <IconButton aria-label={title} onClick={(e) => setAt(e.currentTarget)}>
+            <Icon name={props.icon} size={16} />
+          </IconButton>,
+        )
+      ) : (
+        <Button
+          variant="ghost"
+          size="sm"
+          trailingIcon={<Icon name="arrow-down-s-line" size={14} />}
+          onClick={(e) => setAt(e.currentTarget)}
+        >
+          {title}
+        </Button>
+      )}
       {at && (
         <Popover anchor={at} placement="bottom" label={title} onDismiss={() => setAt(null)}>
           <div className="is-bar-popover">
@@ -287,8 +314,6 @@ function BarSlider(props: { compact: boolean; sliders: BarSliderSpec[] }) {
 export interface StageProps {
   /** Whether the bar keeps only its main actions and puts the rest in the More menu. */
   narrow: boolean;
-  /** Whether the tool row puts its colours, sides and sliders behind presses that open them. */
-  compact: boolean;
   picture: Picture | null;
   size: { width: number; height: number } | null;
   comparing: Comparing | null;
@@ -447,24 +472,54 @@ export function Stage(props: StageProps) {
   );
 }
 
+/** Whether a row shows its compact form: whether its full form, measured
+ *  while it shows, is wider than the row. Each `form`, such as a tool, has
+ *  a full form of its own width. */
+function useCompact(row: RefObject<HTMLElement | null>, form: string): boolean {
+  const [compact, setCompact] = useState(false);
+  const shown = useRef({ compact, form });
+  const needs = useRef(new Map<string, number>());
+  shown.current = { compact, form };
+  const measure = () => {
+    const element = row.current;
+    if (!element) return;
+    const room = element.clientWidth;
+    const now = shown.current;
+    if (!now.compact) {
+      const parts = [...element.children];
+      let need = parseFloat(getComputedStyle(element).columnGap) * (parts.length - 1);
+      for (const part of parts) {
+        const own = getComputedStyle(part);
+        need += part.getBoundingClientRect().width + parseFloat(own.marginLeft) + parseFloat(own.marginRight);
+      }
+      needs.current.set(now.form, need);
+      if (need > room) setCompact(true);
+    } else {
+      const need = needs.current.get(now.form);
+      if (need === undefined || need <= room) setCompact(false);
+    }
+  };
+  useLayoutEffect(measure);
+  useLayoutEffect(() => {
+    const observer = new ResizeObserver(() => measure());
+    observer.observe(row.current!);
+    return () => observer.disconnect();
+  }, []);
+  return compact;
+}
+
 /** The tools of the picture: the brush, the box and the eraser with the
  *  colour they mark in, or the sides Extend grows. */
 function MarkBar(props: StageProps) {
   const [colours, setColours] = useState<MenuAnchor | null>(null);
   const [sidesMenu, setSidesMenu] = useState<MenuAnchor | null>(null);
+  const row = useRef<HTMLDivElement>(null);
+  const compact = useCompact(row, props.tool);
   const tips = useFloatingTips('bottom');
   const name = markerName(props.swatch);
-  const explained = (key: string, text: string, control: ReactNode) => {
-    const t = tips(key, text);
-    return (
-      <span key={key} {...t.hover} className="is-tipwrap">
-        {control}
-        {t.tip}
-      </span>
-    );
-  };
   const tool = (id: Tool, icon: IconName, label: string, text: string) =>
     explained(
+      tips,
       `tool-${id}`,
       text,
       <IconButton
@@ -488,7 +543,7 @@ function MarkBar(props: StageProps) {
     }));
     options = (
       <>
-        {props.compact ? (
+        {compact ? (
           <Button
             variant="ghost"
             size="sm"
@@ -512,7 +567,7 @@ function MarkBar(props: StageProps) {
           </MenuSurface>
         )}
         <BarSlider
-          compact={props.compact}
+          compact={compact}
           sliders={[
             {
               label: 'Extend by',
@@ -560,9 +615,10 @@ function MarkBar(props: StageProps) {
     options = (
       <>
         <span className="is-bar-divider" />
-        {props.compact ? (
+        {compact ? (
           <>
             {explained(
+              tips,
               'colour',
               'Colour: each colour marks one area',
               <button
@@ -594,6 +650,7 @@ function MarkBar(props: StageProps) {
           <span className="is-colours" role="radiogroup" aria-label="Colour">
             {MARKERS.map((marker) =>
               explained(
+                tips,
                 `colour-${marker.swatch}`,
                 `Mark in ${marker.name.toLowerCase()}`,
                 <button
@@ -611,12 +668,11 @@ function MarkBar(props: StageProps) {
             )}
           </span>
         )}
-        <BarSlider compact={props.compact} sliders={sliders} />
+        <BarSlider compact={compact} sliders={sliders} icon="equalizer-line" />
         {explained(
+          tips,
           'invert',
-          marked
-            ? `Mark everything except the ${name.toLowerCase()} marks`
-            : `Mark a part in ${name.toLowerCase()} first`,
+          marked ? 'Mark everything that is not marked' : `Mark a part in ${name.toLowerCase()} first`,
           invert,
         )}
       </>
@@ -624,7 +680,7 @@ function MarkBar(props: StageProps) {
   }
 
   return (
-    <div className="is-markbar">
+    <div ref={row} className="is-markbar">
       <span className="is-tools" role="toolbar" aria-label="Tools">
         {tool('brush', 'paint-brush-line', 'Brush', 'Brush: paint over a part to change it')}
         {tool('rectangle', 'rectangle-line', 'Box', 'Box: drag over a part to change it')}
@@ -644,16 +700,6 @@ export function StageBar(props: StageProps) {
   const tips = useFloatingTips('bottom');
   const { picture } = props;
   const actions = props.actions;
-  /** A control with a tooltip that explains the app's word on it. */
-  const explained = (key: string, text: string, control: ReactNode) => {
-    const t = tips(key, text);
-    return (
-      <span {...t.hover} className="is-tipwrap">
-        {control}
-        {t.tip}
-      </span>
-    );
-  };
 
   let bar = null;
   if (props.comparing) {
@@ -671,6 +717,7 @@ export function StageBar(props: StageProps) {
         {actions.beforeAfter &&
           (props.narrow
             ? explained(
+                tips,
                 'before-after',
                 'Before and after',
                 <IconButton aria-label="Before and after" onClick={actions.beforeAfter}>
@@ -678,6 +725,7 @@ export function StageBar(props: StageProps) {
                 </IconButton>,
               )
             : explained(
+                tips,
                 'before-after',
                 'Slide to see the picture before this change',
                 <BarToggle on={false} onClick={actions.beforeAfter}>
@@ -687,6 +735,7 @@ export function StageBar(props: StageProps) {
         {actions.vary &&
           !props.narrow &&
           explained(
+            tips,
             'vary',
             'New pictures close to this one',
             <Button
@@ -702,6 +751,7 @@ export function StageBar(props: StageProps) {
         {actions.enlarge &&
           !props.narrow &&
           explained(
+            tips,
             'enlarge',
             'A larger, sharper copy',
             <Button variant="ghost" size="sm" icon={<Icon name="zoom-in-line" size={14} />} onClick={actions.enlarge}>

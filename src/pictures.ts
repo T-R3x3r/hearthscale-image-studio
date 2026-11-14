@@ -69,15 +69,19 @@ export async function prepared(file: Blob): Promise<Blob> {
   }
 }
 
-/** The pixels of a picture, exactly as its file holds them, at a size: a
- *  picture of another size is scaled to it. */
+/** The pixels of a picture, exactly as its file holds them. A picture of
+ *  another size than the one asked for is refused. */
 export async function pixelsOf(blob: Blob, width: number, height: number): Promise<ImageData> {
   const bitmap = await createImageBitmap(blob, { colorSpaceConversion: 'none', premultiplyAlpha: 'none' });
+  if (bitmap.width !== width || bitmap.height !== height) {
+    bitmap.close();
+    throw new Error(`The picture came back at ${bitmap.width} by ${bitmap.height}, not ${width} by ${height}.`);
+  }
   const canvas = document.createElement('canvas');
   canvas.width = width;
   canvas.height = height;
   const context = canvas.getContext('2d', { willReadFrequently: true })!;
-  context.drawImage(bitmap, 0, 0, width, height);
+  context.drawImage(bitmap, 0, 0);
   bitmap.close();
   return context.getImageData(0, 0, width, height);
 }

@@ -70,6 +70,9 @@ export class Marks {
   areas: Area[] = [];
   width = 0;
   height = 0;
+  /** The picture's pixels per pixel of the screen, as the marks are drawn
+   *  now: the brush's size and the soft edge are set in the screen's. */
+  scale = 1;
   version = 0;
   private listeners = new Set<() => void>();
 
@@ -113,6 +116,16 @@ export class Marks {
     return this.areas.filter((area) => area.swatch !== swatch);
   }
 
+  /** Takes what `draw` covers from every colour but `swatch`. */
+  private clear(swatch: Swatch | null, draw: (context: CanvasRenderingContext2D) => void) {
+    for (const other of this.others(swatch)) {
+      const context = other.canvas.getContext('2d')!;
+      context.globalCompositeOperation = 'destination-out';
+      draw(context);
+      context.globalCompositeOperation = 'source-over';
+    }
+  }
+
   /** Paints a line of the brush in a colour, or erases every colour along
    *  it where `swatch` is null. */
   stroke(swatch: Swatch | null, from: Point, to: Point, size: number) {
@@ -121,24 +134,14 @@ export class Marks {
       context.strokeStyle = inkOf(swatch);
       line(context, from, to, size);
     }
-    for (const other of this.others(swatch)) {
-      const context = other.canvas.getContext('2d')!;
-      context.globalCompositeOperation = 'destination-out';
-      line(context, from, to, size);
-      context.globalCompositeOperation = 'source-over';
-    }
+    this.clear(swatch, (context) => line(context, from, to, size));
   }
 
   rectangle(swatch: Swatch, x: number, y: number, width: number, height: number) {
     const context = this.area(swatch).canvas.getContext('2d')!;
     context.fillStyle = inkOf(swatch);
     context.fillRect(x, y, width, height);
-    for (const other of this.others(swatch)) {
-      const each = other.canvas.getContext('2d')!;
-      each.globalCompositeOperation = 'destination-out';
-      each.fillRect(x, y, width, height);
-      each.globalCompositeOperation = 'source-over';
-    }
+    this.clear(swatch, (each) => each.fillRect(x, y, width, height));
   }
 
   /** Marks in a colour everything that no colour marks yet, and lets go of
@@ -303,14 +306,15 @@ export function blendOf(mask: Uint8Array, width: number, height: number, soft: n
   return blend;
 }
 
-/** Lays a job's picture into the picture by the blend, pixel by pixel. */
+/** Lays a job's picture into the picture by the blend, pixel by pixel,
+ *  its transparency included. */
 export function blendInto(base: ImageData, result: ImageData, blend: Float32Array): void {
   const to = base.data;
   const from = result.data;
   for (let i = 0, p = 0; i < blend.length; i++, p += 4) {
     const share = blend[i];
     if (share === 0) continue;
-    for (let c = 0; c < 3; c++)
+    for (let c = 0; c < 4; c++)
       to[p + c] = share === 1 ? from[p + c] : Math.round(to[p + c] + (from[p + c] - to[p + c]) * share);
   }
 }
@@ -320,6 +324,6 @@ export function blendInto(base: ImageData, result: ImageData, blend: Float32Arra
 export function paintedWith(base: ImageData, mask: Uint8Array, swatch: Swatch): ImageData {
   const painted = new ImageData(new Uint8ClampedArray(base.data), base.width, base.height);
   const [r, g, b] = MARKERS.find((marker) => marker.swatch === swatch)!.paint;
-  for (let i = 0; i < mask.length; i++) if (mask[i]) painted.data.set([r, g, b], i * 4);
+  for (let i = 0; i < mask.length; i++) if (mask[i]) painted.data.set([r, g, b, 255], i * 4);
   return painted;
 }
