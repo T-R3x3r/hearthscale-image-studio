@@ -68,7 +68,7 @@ export const IDEAS = [
 
 /** The words of a marked area the person left empty: what was there goes. */
 export const REMOVE_WORDS =
-  'Remove what is there. Fill the place with the background around it, seamless, as if nothing had ever been there.';
+  'Remove every object, person, text and interface element in front of the scene, and show the background behind them, seamless, as if nothing had ever been there.';
 
 /** The words of a marked area that holds pictures but no words of its own. */
 export const REFERENCE_WORDS = 'Put the subject of the added picture here, matching the light and the scene.';

@@ -328,7 +328,8 @@ export function Stage(props: StageProps) {
   const area = useRef<HTMLDivElement>(null);
   const tips = useFloatingTips('top');
   const { picture, size, margins } = props;
-  const marking = props.markable && props.tool !== 'extend' && !props.comparing && !props.live;
+  const tools = props.markable && !!picture && !props.comparing && !props.live;
+  const marking = tools && props.tool !== 'extend';
   const framed =
     size && margins
       ? { width: size.width + margins.left + margins.right, height: size.height + margins.top + margins.bottom }
@@ -437,8 +438,8 @@ export function Stage(props: StageProps) {
   }
 
   return (
-    <div className="is-stage">
-      {props.markable && picture && !props.comparing && !props.live && <MarkBar {...props} />}
+    <div className="is-stage" data-tools={tools}>
+      {tools && <MarkBar {...props} />}
       <div className="is-stage-area" ref={area}>
         {body}
       </div>

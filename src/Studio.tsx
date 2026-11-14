@@ -344,7 +344,7 @@ export function Studio() {
   const [currentTool, setTool] = useState<Tool>('brush');
   const [swatch, setSwatch] = useState<Swatch>('rose');
   const [brushSize, setBrushSize] = useState(48);
-  const [softEdge, setSoftEdge] = useState(12);
+  const [softEdge, setSoftEdge] = useState(8);
   const [sides, setSides] = useState<Sides>({ left: false, right: true, top: false, bottom: false, share: 0.25 });
   const [compareSet, setCompareSet] = useState<string | null>(null);
   const [compareRuns, setCompareRuns] = useState<{ run: Run; picture: Picture | null }[]>([]);
@@ -1583,7 +1583,7 @@ export function Studio() {
                         <Meter value={stripLive.fraction} label="Progress" variant="ring" />
                       </div>
                     ))}
-                {stripLive && (!stageLive || plan) && <span className="is-strip-state">{liveLabel}</span>}
+                {stripLive && !stageLive && <span className="is-strip-state">{liveLabel}</span>}
                 {stripLive ? (
                   <Button
                     variant="ghost"

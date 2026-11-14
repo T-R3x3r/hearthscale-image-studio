@@ -359,7 +359,12 @@ body {
   pointer-events: none;
 }
 
-/* The tools of the picture, in one row over it. */
+/* The tools of the picture, in one row right under the top bar, with the
+   stage's inset between them and the picture. */
+.is-stage[data-tools='true'] {
+  padding-top: var(--space);
+}
+
 .is-markbar {
   display: flex;
   flex: none;
@@ -518,6 +523,7 @@ body {
 
 .is-bar-label {
   margin-left: var(--gap-row);
+  white-space: nowrap;
   color: var(--mut);
   font-size: var(--fs-row);
 }
