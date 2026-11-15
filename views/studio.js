@@ -404,8 +404,8 @@ body {
   pointer-events: none;
 }
 
-/* The tools of the picture, in one row right under the top bar, with the
-   stage's inset between them and the picture. */
+/* The tools of the picture, in one row right under the top bar across the
+   stage's width, with the stage's inset between them and the picture. */
 .is-stage[data-tools='true'] {
   padding-top: var(--space);
 }
@@ -417,9 +417,8 @@ body {
   justify-content: center;
   gap: var(--gap-inline);
   width: 100%;
-  max-width: var(--studio-column);
   height: var(--h-ctl);
-  margin: 0 auto var(--gap-row);
+  margin: 0 0 var(--gap-row);
 }
 
 .is-tools,
